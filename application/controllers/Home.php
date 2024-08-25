@@ -1,95 +1,94 @@
 <?php
-defined('BASEPATH') or exit('No direct script access allowed');
+defined('BASEPATH') OR exit('No direct script access allowed');
 
-class Home extends CI_Controller
-{
-    public function __construct()
-    {
+class Home extends CI_Controller {
+
+    private $video_folder = 'assets/videos'; // Change this to your actual video folder path
+    private $items_per_page = 10;
+
+    public function __construct() {
         parent::__construct();
         $this->load->helper('url');
-        $this->load->helper('file');
         $this->load->library('pagination');
+        $this->load->helper('form');
     }
 
-    public function index($page = 1)
-    {
-        // Folder where the videos are stored
-        $_SESSION["video_folder"] = './assets/videos/';
-        
-        // Get all video files
-        $videos = array_diff(scandir($_SESSION["video_folder"]), array('.', '..'));
+    public function index($page = 1) {
+        // Search and Filter Handling
+        $search_query = $this->input->get('search');
+        $filter_query = $this->input->get('filter'); // You can extend this to handle specific filters
 
-        // Pagination settings
+        // Fetch all videos
+        $videos = array_diff(scandir($this->video_folder), array('.', '..'));
+
+        // Filter videos by search query
+        if ($search_query) {
+            $videos = array_filter($videos, function($video) use ($search_query) {
+                return stripos($video, $search_query) !== false;
+            });
+        }
+
+        // Pagination Setup
+        $total_videos = count($videos);
+        $total_pages = ceil($total_videos / $this->items_per_page);
+        $start_index = ($page - 1) * $this->items_per_page;
+        $videos = array_slice($videos, $start_index, $this->items_per_page);
+
+        // Pagination Links
         $config['base_url'] = base_url('home/index');
-        $config['total_rows'] = count($videos);
-        $config['per_page'] = 20;
-        $config['uri_segment'] = 3;
-        $config['use_page_numbers'] = TRUE;
-        $config['first_link'] = 'First';
-        $config['last_link'] = 'Last';
-        $config['next_link'] = 'Next';
-        $config['prev_link'] = 'Prev';
-        $config['cur_tag_open'] = '<strong class="current">';
-        $config['cur_tag_close'] = '</strong>';
-        $config['num_tag_open'] = '<span class="page">';
-        $config['num_tag_close'] = '</span>';
-
-        // Initialize pagination
+        $config['total_rows'] = $total_videos;
+        $config['per_page'] = $this->items_per_page;
         $this->pagination->initialize($config);
+        $pagination = $this->pagination->create_links();
 
-        // Calculate the offset
-        $offset = ($page - 1) * $config['per_page'];
-
-        // Get the current page of videos
-        $videos = array_slice($videos, $offset, $config['per_page']);
-
-        // Pass videos and pagination links to the view
+        // Pass data to view
         $data['videos'] = $videos;
-        $data['video_folder'] = $_SESSION["video_folder"];
-        $data['pagination'] = $this->pagination->create_links();
+        $data['pagination'] = $pagination;
+        $data['total_pages'] = $total_pages;
+        $data['video_folder'] = $this->video_folder;
 
-        $this->load->view('video_gallery', $data);
+        $this->load->view('newview', $data);
     }
 
-    // Method to rename a video file
-    public function renameVideo()
-    {
+    public function renameVideo() {
         $old_name = $this->input->post('old_name');
         $new_name = $this->input->post('new_name');
-        
-        $old_path = $_SESSION["video_folder"] . $old_name;
-        $new_path = $_SESSION["video_folder"] . $new_name;
 
-        if (file_exists($old_path)) {
-            if (rename($old_path, $new_path)) {
-                $response = array('success' => true, 'message' => 'Video renamed successfully');
+        if ($old_name && $new_name) {
+            $old_path = $this->video_folder . $old_name;
+            $new_path = $this->video_folder . $new_name;
+
+            if (file_exists($old_path) && !file_exists($new_path)) {
+                if (rename($old_path, $new_path)) {
+                    echo json_encode(['success' => true]);
+                } else {
+                    echo json_encode(['success' => false, 'error' => 'Could not rename the file.']);
+                }
             } else {
-                $response = array('success' => false, 'message' => 'Error renaming video');
+                echo json_encode(['success' => false, 'error' => 'File does not exist or new name already in use.']);
             }
         } else {
-            $response = array('success' => false, 'message' => 'Original video not found');
+            echo json_encode(['success' => false, 'error' => 'Invalid file names provided.']);
         }
-
-        echo json_encode($response);
     }
 
-    // Method to delete a video file
-    public function deleteVideo()
-    {
+    public function deleteVideo() {
         $video_name = $this->input->post('video_name');
-        
-        $video_path = $_SESSION["video_folder"] . $video_name;
 
-        if (file_exists($video_path)) {
-            if (unlink($video_path)) {
-                $response = array('success' => true, 'message' => 'Video deleted successfully');
+        if ($video_name) {
+            $file_path = $this->video_folder . $video_name;
+
+            if (file_exists($file_path)) {
+                if (unlink($file_path)) {
+                    echo json_encode(['success' => true]);
+                } else {
+                    echo json_encode(['success' => false, 'error' => 'Could not delete the file.']);
+                }
             } else {
-                $response = array('success' => false, 'message' => 'Error deleting video');
+                echo json_encode(['success' => false, 'error' => 'File does not exist.']);
             }
         } else {
-            $response = array('success' => false, 'message' => 'Video not found');
+            echo json_encode(['success' => false, 'error' => 'Invalid file name provided.']);
         }
-
-        echo json_encode($response);
     }
 }

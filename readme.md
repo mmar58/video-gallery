@@ -15,11 +15,14 @@ I was thinking about a way to view my small videos, like or add additinal data w
 
 1. Can view all videos in folder and play them
 2. Manage the videos
-3. Like videso and search  videos based on  file name or tags 
+3. Like videso and search  videos based on  file name or tags
 4. Sort videos by date and types
 
 ## Working
 
-* Adding new features
+- [ ] Attach the new UI with the functionalities
+  - [ ] Create rows based on the data
+  - [ ] Add video name and other details
+- [ ] Implement the features from the UI in the controller
 
 
