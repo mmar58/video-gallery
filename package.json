@@ -1,0 +1,22 @@
+{
+    "name": "decasonns.car-rental",
+    "version": "1.04.0",
+    "description": "It's a project for using in car rental shops. It will automate your system",
+    "main": "index.php",
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/mmar58/accounts.git"
+    },
+    "keywords": [
+        "accounts"
+    ],
+    "author": "Decassons Team",
+    "license": "UNLICENSED",
+    "bugs": {
+        "url": "https://github.com/mmar58/accounts/issues"
+    },
+    "homepage": "https://github.com/mmar58/accounts#readme"
+}
