@@ -1,0 +1,2 @@
+The framework using is codeignitor 3 under The MIT License
+https://github.com/bcit-ci/CodeIgniter/blob/develop/license.txt
