@@ -9,20 +9,27 @@ I was thinking about a way to view my small videos, like or add additinal data w
 * Import the databse from `database.sql`
 * Goto your browser and type `localhost/[the name of the folder]`. Of course don't forget to start xampp server first.
 * Create `.assets/videos` folder and upload your videos to that folder, I have added that folder to gitignore to avoid video uploading to gitlab
+* Create `.assets/thumbnails` folder,  have added that folder to gitignore to avoid video uploading to gitlab
+* Install [ffmpeg](https://www.ffmpeg.org/download.html) in your server or computer to allow auto generate thumbnails for the videos
 
 ## Features
 
 
-1. Can view all videos in folder and play them
-2. Manage the videos
-3. Like videso and search  videos based on  file name or tags
-4. Sort videos by date and types
+1. Manage your videos
+2. View videos in resizeable, floating div
+3. Play videos in new tab
+4. Play multiple videos at a time
+5. Autometic generate and manage thumnails for the video
+6. Spports liking and tagging videos
+7. Supports sorting videos based on like
+8. Supports searching and filtering videos based on tags
 
 ## Working
 
 - [ ] Attach the new UI with the functionalities
-  - [ ] Create rows based on the data
+  - [x] Create rows based on the data
   - [ ] Add video name and other details
+  - [ ] Generate thumbnails for the videos and show them
 - [ ] Implement the features from the UI in the controller
 
 
