@@ -48,6 +48,7 @@ class Home extends CI_Controller {
         $data['video_folder'] = $this->video_folder;
 
         $this->load->view('newview', $data);
+//        $this->load->view('video_gallery', $data);
     }
 
     public function renameVideo() {

@@ -332,32 +332,25 @@
 </div>
 
 <script>
+
     let videos = [
-        { id: 1, title: "Breathtaking Nature Scenes", description: "Experience the beauty of untouched wilderness in 4K resolution.", thumbnail: "https://example.com/thumbnails/nature.jpg", likes: 0, tags: ["nature", "4K"], videoUrl: "https://example.com/videos/nature.mp4", fileSize: "1.2 GB", duration: "15:30", resolution: "3840x2160", codec: "H.264", category: "nature" },
-        { id: 2, title: "Urban Exploration", description: "Discover hidden gems in the world's most vibrant cities.", thumbnail: "https://example.com/thumbnails/cityscape.jpg", likes: 0, tags: ["urban", "travel"], videoUrl: "https://example.com/videos/urban.mp4", fileSize: "850 MB", duration: "12:45", resolution: "1920x1080", codec: "H.265", category: "urban" },
-        { id: 3, title: "Underwater Wonders", description: "Dive into the mesmerizing world beneath the waves.", thumbnail: "https://example.com/thumbnails/underwater.jpg", likes: 0, tags: ["ocean", "marine-life"], videoUrl: "https://example.com/videos/underwater.mp4", fileSize: "1.5 GB", duration: "18:20", resolution: "3840x2160", codec: "H.264", category: "nature" },
-        { id: 4, title: "Cosmic Journey", description: "Explore the vastness of space with stunning visualizations.", thumbnail: "https://example.com/thumbnails/space.jpg", likes: 0, tags: ["space", "astronomy"], videoUrl: "https://example.com/videos/space.mp4", fileSize: "2.1 GB", duration: "22:15", resolution: "3840x2160", codec: "H.265", category: "science" },
-        { id: 5, title: "Culinary Delights", description: "Indulge in a visual feast of gourmet cuisine from around the world.", thumbnail: "https://example.com/thumbnails/culinary.jpg", likes: 0, tags: ["food", "cooking"], videoUrl: "https://example.com/videos/culinary.mp4", fileSize: "750 MB", duration: "10:50", resolution: "1920x1080", codec: "H.264", category: "art" },
-        { id: 6, title: "Wildlife in Action", description: "Witness the raw beauty of animals in their natural habitats.", thumbnail: "https://example.com/thumbnails/wildlife.jpg", likes: 0, tags: ["animals", "nature"], videoUrl: "https://example.com/videos/wildlife.mp4", fileSize: "1.8 GB", duration: "20:05", resolution: "3840x2160", codec: "H.265", category: "nature" },
-        { id: 7, title: "Mountain Adventures", description: "Experience the thrill of scaling majestic peaks.", thumbnail: "https://example.com/thumbnails/mountain.jpg", likes: 0, tags: ["adventure", "nature"], videoUrl: "https://example.com/videos/mountain.mp4", fileSize: "1.6 GB", duration: "19:30", resolution: "3840x2160", codec: "H.264", category: "adventure" },
-        { id: 8, title: "Historical Wonders", description: "Journey through time with visits to ancient landmarks.", thumbnail: "https://example.com/thumbnails/history.jpg", likes: 0, tags: ["history", "travel"], videoUrl: "https://example.com/videos/history.mp4", fileSize: "1.3 GB", duration: "16:45", resolution: "3840x2160", codec: "H.265", category: "urban" },
-        { id: 9, title: "Extreme Sports", description: "Feel the adrenaline rush with heart-pounding extreme sports footage.", thumbnail: "https://example.com/thumbnails/extreme.jpg", likes: 0, tags: ["sports", "adventure"], videoUrl: "https://example.com/videos/extreme.mp4", fileSize: "1.9 GB", duration: "21:10", resolution: "3840x2160", codec: "H.264", category: "adventure" },
-        { id: 10, title: "Artistic Expressions", description: "Explore the world of contemporary art and creative processes.", thumbnail: "https://example.com/thumbnails/art.jpg", likes: 0, tags: ["art", "culture"], videoUrl: "https://example.com/videos/art.mp4", fileSize: "1.1 GB", duration: "14:20", resolution: "3840x2160", codec: "H.265", category: "art" }
+        <?php for ($i = 0; $i < count($videos); $i++): ?>
+        <?php $video=$videos[$i];?>
+        { id: <?php echo $i;?>, title: "<?php echo $video; ?> ", description: "Experience the beauty of untouched wilderness in 4K resolution.", thumbnail: "https://example.com/thumbnails/nature.jpg", likes: 0, tags: ["nature", "4K"], videoUrl: "<?php echo base_url($video_folder ."/". $video); ?>", fileSize: "1.2 GB", duration: "15:30", resolution: "3840x2160", codec: "H.264", category: "nature" },
+        <?php endfor; ?>
     ];
 
+    let filteredVideos=[...videos]
     let currentVideoId = null;
     let videoPopups = [];
     let currentPage = 1;
     const videosPerPage = 4;
-    let filteredVideos = [...videos];
 
     function renderVideos() {
         const gallery = document.getElementById('videoGallery');
         gallery.innerHTML = '';
-
-        const startIndex = (currentPage - 1) * videosPerPage;
-        const endIndex = startIndex + videosPerPage;
-        const currentVideos = filteredVideos.slice(startIndex, endIndex);
+        console.log(filteredVideos)
+        const currentVideos = filteredVideos;
 
         currentVideos.forEach(video => {
             const videoElement = document.createElement('div');
@@ -420,13 +413,13 @@
         popup.style.top = `${window.innerHeight / 2 - 225}px`;
         popup.style.width = '800px';
         popup.style.height = '450px';
-
+        // console.log(video.videoUrl)
         popup.innerHTML = `
         <div class="popup-header">
           <h3 class="popup-title">${video.title}</h3>
           <button class="close-popup">&times;</button>
         </div>
-        <video controls>
+        <video controls autoplay>
           <source src="${video.videoUrl}" type="video/mp4">
           Your browser does not support the video tag.
         </video>
@@ -573,6 +566,7 @@
             if (videoIndex !== -1) {
                 videos[videoIndex].tags = [...new Set([...videos[videoIndex].tags, ...newTags])];
                 filteredVideos = [...videos];
+                console.log(filteredVideos)
                 renderVideos();
             }
         }

@@ -180,7 +180,7 @@
 <div class="gallery">
     <?php foreach ($videos as $video): ?>
         <div class="video-container" data-video="<?php echo $video; ?>">
-            <video class="video-thumbnail" data-title="<?php echo $video; ?>" src="<?php echo base_url($video_folder . $video); ?>" controls></video>
+            <video class="video-thumbnail" data-title="<?php echo $video; ?>" src="<?php echo base_url($video_folder ."/". $video); ?>" controls></video>
             <div class="video-title"><?php echo $video; ?></div>
 
             <!-- Video Actions Section -->
