@@ -1,255 +1,12 @@
-<html><head><base href="https://videogallery.example.com/">
+<html>
+<script>
+    fetch('<?php echo base_url('home/GetAllVideoList'); ?>').then(response=>response.json()).then(data=>{console.log(data)});
+</script>
+<head><base href="https://videogallery.example.com/">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Video Gallery with Search, Filters, and Pagination</title>
-    <style>
-        body {
-            font-family: 'Arial', sans-serif;
-            margin: 0;
-            padding: 0;
-            background-color: #1a1a1a;
-            color: #fff;
-        }
-        header {
-            background-color: #2c2c2c;
-            padding: 20px;
-            text-align: center;
-        }
-        h1 {
-            margin: 0;
-            font-size: 2.5em;
-            color: #e50914;
-        }
-        .search-filter-container {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 20px;
-            background-color: #2c2c2c;
-        }
-        .search-box {
-            padding: 10px;
-            font-size: 16px;
-            border: none;
-            border-radius: 5px 0 0 5px;
-            width: 300px;
-        }
-        .search-button, .filter-button {
-            padding: 10px 20px;
-            font-size: 16px;
-            background-color: #e50914;
-            color: white;
-            border: none;
-            cursor: pointer;
-        }
-        .search-button {
-            border-radius: 0 5px 5px 0;
-        }
-        .filter-button {
-            border-radius: 5px;
-            margin-left: 10px;
-        }
-        .search-button:hover, .filter-button:hover {
-            background-color: #f40612;
-        }
-        .gallery {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
-            padding: 20px;
-        }
-        .video-item {
-            position: relative;
-            overflow: hidden;
-            border-radius: 10px;
-            transition: transform 0.3s ease;
-            cursor: pointer;
-        }
-        .video-item:hover {
-            transform: scale(1.05);
-        }
-        .video-thumbnail {
-            width: 100%;
-            height: 0;
-            padding-bottom: 56.25%; /* 16:9 aspect ratio */
-            background-size: cover;
-            background-position: center;
-        }
-        .video-info {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: rgba(0, 0, 0, 0.7);
-            padding: 10px;
-            transform: translateY(100%);
-            transition: transform 0.3s ease;
-        }
-        .video-item:hover .video-info {
-            transform: translateY(0);
-        }
-        .video-title {
-            margin: 0;
-            font-size: 1.2em;
-        }
-        .video-description {
-            margin: 5px 0 0;
-            font-size: 0.9em;
-            opacity: 0.8;
-        }
-        .video-actions {
-            display: flex;
-            justify-content: space-between;
-            flex-wrap: wrap;
-            margin-top: 10px;
-        }
-        .video-actions button {
-            background-color: #e50914;
-            color: white;
-            border: none;
-            padding: 5px 10px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 0.8em;
-            margin: 2px;
-        }
-        .video-actions button:hover {
-            background-color: #f40612;
-        }
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 1;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            overflow: auto;
-            background-color: rgba(0,0,0,0.8);
-        }
-        .modal-content {
-            background-color: #2c2c2c;
-            margin: 5% auto;
-            padding: 20px;
-            border: 1px solid #888;
-            width: 90%;
-            max-width: 800px;
-            border-radius: 10px;
-        }
-        .close {
-            color: #aaa;
-            float: right;
-            font-size: 28px;
-            font-weight: bold;
-            cursor: pointer;
-        }
-        .close:hover,
-        .close:focus {
-            color: #fff;
-            text-decoration: none;
-            cursor: pointer;
-        }
-        .modal input, .modal textarea, .modal select {
-            width: 100%;
-            padding: 10px;
-            margin: 10px 0;
-            border-radius: 5px;
-            border: 1px solid #444;
-            background-color: #333;
-            color: #fff;
-        }
-        .modal button {
-            background-color: #e50914;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 1em;
-            margin-top: 10px;
-        }
-        .modal button:hover {
-            background-color: #f40612;
-        }
-        .tags {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 5px;
-            margin-top: 5px;
-        }
-        .tag {
-            background-color: #444;
-            color: #fff;
-            padding: 2px 8px;
-            border-radius: 10px;
-            font-size: 0.8em;
-        }
-        .video-popup {
-            position: fixed;
-            z-index: 1000;
-            background-color: #000;
-            border: 2px solid #e50914;
-            border-radius: 10px;
-            box-shadow: 0 0 20px rgba(229, 9, 20, 0.5);
-            resize: both;
-            overflow: hidden;
-            min-width: 320px;
-            min-height: 240px;
-        }
-        .video-popup .popup-header {
-            background-color: #2c2c2c;
-            padding: 10px;
-            cursor: move;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .video-popup .popup-title {
-            margin: 0;
-            font-size: 1.2em;
-            color: #fff;
-        }
-        .video-popup .close-popup {
-            color: #fff;
-            font-size: 24px;
-            cursor: pointer;
-            background: none;
-            border: none;
-        }
-        .video-popup video {
-            width: 100%;
-            height: calc(100% - 40px);
-            object-fit: contain;
-        }
-        .pagination {
-            display: flex;
-            justify-content: center;
-            margin-top: 20px;
-            margin-bottom: 20px;
-        }
-        .pagination button {
-            background-color: #e50914;
-            color: white;
-            border: none;
-            padding: 10px 15px;
-            margin: 0 5px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 1em;
-        }
-        .pagination button:hover {
-            background-color: #f40612;
-        }
-        .pagination button:disabled {
-            background-color: #555;
-            cursor: not-allowed;
-        }
-        .page-info {
-            color: #fff;
-            margin: 0 15px;
-            align-self: center;
-        }
-    </style>
+    <link rel="stylesheet" href="<?php echo base_url("assets/css/main.css");?>">
 </head>
 <body>
 <header>
@@ -260,6 +17,12 @@
     <input type="text" id="searchInput" class="search-box" placeholder="Search videos...">
     <button onclick="searchVideos()" class="search-button">Search</button>
     <button onclick="showFilterModal()" class="filter-button">Filter</button>
+</div>
+
+<div class="pagination" id="pagination1">
+    <button id="prevPage1" onclick="changePage(-1)">Previous</button>
+    <span class="page-info" id="pageInfo1"></span>
+    <button id="nextPage1" onclick="changePage(1)">Next</button>
 </div>
 
 <main class="gallery" id="videoGallery">
@@ -343,7 +106,13 @@
     let filteredVideos=[...videos]
     let currentVideoId = null;
     let videoPopups = [];
-    let currentPage = 1;
+    let currentPage = <?php echo $curpage;?>
+
+    let totalPages = <?php echo $total_pages;?>
+
+
+    let videoThumblinesData={}
+    let videoElements;
     const videosPerPage = 4;
 
     function renderVideos() {
@@ -356,8 +125,11 @@
             const videoElement = document.createElement('div');
             videoElement.className = 'video-item';
             videoElement.onclick = () => playVideo(video.id);
+            console.log(video)
             videoElement.innerHTML = `
-          <div class="video-thumbnail" style="background-image: url('${video.thumbnail}');"></div>
+          <div class="video-thumbnail" style="background-image: url('${video.thumbnail}');">
+           <video class="videoBack" onmouseover="onThumblineHover(this,${video.id})" onmouseout="onThumblineHoverOut(this,${video.id})" muted data-title="${video.title}" src="${video.videoUrl}" controls></video>
+           </div>
           <div class="video-info">
             <h2 class="video-title">${video.title}</h2>
             <p class="video-description">${video.description}</p>
@@ -376,27 +148,44 @@
         `;
             gallery.appendChild(videoElement);
         });
-
+        videoElements=document.getElementsByClassName("videoBack")
         updatePagination();
     }
 
     function updatePagination() {
-        const totalPages = Math.ceil(filteredVideos.length / videosPerPage);
+
         const prevButton = document.getElementById('prevPage');
         const nextButton = document.getElementById('nextPage');
         const pageInfo = document.getElementById('pageInfo');
 
+        const prevButton1 = document.getElementById('prevPage1');
+        const nextButton1 = document.getElementById('nextPage1');
+        const pageInfo1 = document.getElementById('pageInfo1');
         prevButton.disabled = currentPage === 1;
         nextButton.disabled = currentPage === totalPages;
         pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
+        prevButton1.disabled = currentPage === 1;
+        nextButton1.disabled = currentPage === totalPages;
+        pageInfo1.textContent = `Page ${currentPage} of ${totalPages}`;
     }
-
+    // Video thumb line functions
+    function onThumblineHover(videoDiv,id){
+        if(videoThumblinesData[id]!=null){
+            clearTimeout(videoThumblinesData[id])
+            videoThumblinesData[id]=null
+        }
+        videoDiv.play()
+    }
+    function onThumblineHoverOut(videoDiv,id){
+        videoThumblinesData[id] =setTimeout(function (){videoDiv.pause();videoThumblinesData[id]=null},10000)
+        // videoThumblinesData.id={Set}
+    }
+    // Video thumb line functions end
     function changePage(direction) {
-        const totalPages = Math.ceil(filteredVideos.length / videosPerPage);
         currentPage += direction;
         if (currentPage < 1) currentPage = 1;
         if (currentPage > totalPages) currentPage = totalPages;
-        renderVideos();
+        window.location.href = '<?php echo base_url("home/index/"); ?>' + currentPage;
     }
 
     function playVideo(id) {
@@ -407,6 +196,10 @@
     }
 
     function createVideoPopup(video) {
+        // Stopping video thumblines
+        for(let i=0;i<videoElements.length;i++){
+            videoElements[i].pause()
+        }
         const popup = document.createElement('div');
         popup.className = 'video-popup';
         popup.style.left = `${window.innerWidth / 2 - 400}px`;

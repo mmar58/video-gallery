@@ -1,32 +1,26 @@
 <?php
-defined('BASEPATH') OR exit('No direct script access allowed');
+defined('BASEPATH') or exit('No direct script access allowed');
 
-class Home extends CI_Controller {
+class Home extends CI_Controller
+{
 
     private $video_folder = 'assets/videos'; // Change this to your actual video folder path
     private $items_per_page = 10;
 
-    public function __construct() {
+    public function __construct()
+    {
         parent::__construct();
         $this->load->helper('url');
         $this->load->library('pagination');
         $this->load->helper('form');
     }
 
-    public function index($page = 1) {
-        // Search and Filter Handling
-        $search_query = $this->input->get('search');
-        $filter_query = $this->input->get('filter'); // You can extend this to handle specific filters
+    public function index($page = 1)
+    {
 
         // Fetch all videos
         $videos = array_diff(scandir($this->video_folder), array('.', '..'));
 
-        // Filter videos by search query
-        if ($search_query) {
-            $videos = array_filter($videos, function($video) use ($search_query) {
-                return stripos($video, $search_query) !== false;
-            });
-        }
 
         // Pagination Setup
         $total_videos = count($videos);
@@ -40,18 +34,34 @@ class Home extends CI_Controller {
         $config['per_page'] = $this->items_per_page;
         $this->pagination->initialize($config);
         $pagination = $this->pagination->create_links();
-
         // Pass data to view
         $data['videos'] = $videos;
         $data['pagination'] = $pagination;
         $data['total_pages'] = $total_pages;
         $data['video_folder'] = $this->video_folder;
-
+        $data['curpage'] = $page;
         $this->load->view('newview', $data);
 //        $this->load->view('video_gallery', $data);
     }
 
-    public function renameVideo() {
+    function GetAllVideoList()
+    {
+        $videos = array_diff(scandir($this->video_folder), array('.', '..'));
+        $count=count($videos);
+        echo "[";
+        for ($i = 0; $i < $count; $i++) {
+
+            if($videos[$i]!=""){
+                echo '"'.$videos[$i].'"';
+                if ($i < $count - 1)
+                    echo ",";
+            }
+        }
+        echo "]";
+    }
+
+    public function renameVideo()
+    {
         $old_name = $this->input->post('old_name');
         $new_name = $this->input->post('new_name');
 
@@ -73,7 +83,8 @@ class Home extends CI_Controller {
         }
     }
 
-    public function deleteVideo() {
+    public function deleteVideo()
+    {
         $video_name = $this->input->post('video_name');
 
         if ($video_name) {
