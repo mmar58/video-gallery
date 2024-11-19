@@ -12,6 +12,7 @@ class VideosApi extends CI_Controller {
         ;
         echo "hello";
     }
+
     public function GenerateThumbnail()
     {
         $this->extractThumbnail($_GET["name"]);

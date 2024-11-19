@@ -84,6 +84,8 @@ h1 {
     transform: translateY(0);
 }
 .video-title {
+    max-width: 200px;
+    max-height: 32px;
     margin: 0;
     font-size: 1.2em;
 }

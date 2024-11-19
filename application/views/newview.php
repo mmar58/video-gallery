@@ -118,14 +118,13 @@
     function renderVideos() {
         const gallery = document.getElementById('videoGallery');
         gallery.innerHTML = '';
-        console.log(filteredVideos)
-        const currentVideos = filteredVideos;
+        const currentVideos = videos;
 
         currentVideos.forEach(video => {
             const videoElement = document.createElement('div');
             videoElement.className = 'video-item';
             videoElement.onclick = () => playVideo(video.id);
-            console.log(video)
+            // console.log(video)
             videoElement.innerHTML = `
           <div class="video-thumbnail" style="background-image: url('${video.thumbnail}');">
            <video class="videoBack" onmouseover="onThumblineHover(this,${video.id})" onmouseout="onThumblineHoverOut(this,${video.id})" muted data-title="${video.title}" src="${video.videoUrl}" controls></video>
@@ -313,30 +312,51 @@
             newWindow.document.close();
         }
     }
-
+    let renameModal=document.getElementById('renameModal')
+    let renameVideoInput=document.getElementById("newVideoName")
     function renamePrompt(id) {
         currentVideoId = id;
-        document.getElementById('renameModal').style.display = 'block';
+        const video = videos.find(v => v.id === id);
+        renameVideoInput.value=video.title
+        renameModal.style.display = 'block';
     }
 
     function renameVideo() {
         const newName = document.getElementById('newVideoName').value;
         if (newName) {
             const videoIndex = videos.findIndex(v => v.id === currentVideoId);
+            fetch('<?php echo base_url("assets/fileControl.py");?>', {
+                method: 'POST', // Specify the request type
+                headers: {
+                    'Content-Type': 'application/json', // Ensure the content type is JSON
+                },
+                body: JSON.stringify({ rename_video: newName ,video_name:videos[videoIndex].title}), // Send the video name as the payload
+            }).then(response=>response.text()).then(textData=>console.log(textData))
             if (videoIndex !== -1) {
                 videos[videoIndex].title = newName;
-                filteredVideos = [...videos];
-                renderVideos();
+                window.location.reload();
             }
+
         }
         document.getElementById('renameModal').style.display = 'none';
+
     }
 
     function deleteVideo(id) {
+        const video = videos.find(v => v.id === id);
+        console.log(video)
+        fetch('<?php echo base_url("assets/fileControl.py");?>', {
+            method: 'POST', // Specify the request type
+            headers: {
+                'Content-Type': 'application/json', // Ensure the content type is JSON
+            },
+            body: JSON.stringify({ delete_video: video.title }), // Send the video name as the payload
+        }).then(response=>response.text()).then(textData=>console.log(textData))
         videos = videos.filter(v => v.id !== id);
-        filteredVideos = filteredVideos.filter(v => v.id !== id);
+        // filteredVideos = filteredVideos.filter(v => v.id !== id);
         renderVideos();
     }
+
 
     function likeVideo(id) {
         const videoIndex = videos.findIndex(v => v.id === id);

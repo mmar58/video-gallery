@@ -4,7 +4,7 @@ defined('BASEPATH') or exit('No direct script access allowed');
 class Home extends CI_Controller
 {
 
-    private $video_folder = 'assets/videos'; // Change this to your actual video folder path
+    private $video_folder = 'assets/videos/'; // Change this to your actual video folder path
     private $items_per_page = 10;
 
     public function __construct()
@@ -85,11 +85,13 @@ class Home extends CI_Controller
 
     public function deleteVideo()
     {
-        $video_name = $this->input->post('video_name');
+        // Decode JSON payload
+        $data = json_decode(file_get_contents('php://input'), true);
+        $video_name = $data['video_name'] ?? null;
 
         if ($video_name) {
-            $file_path = $this->video_folder . $video_name;
-
+            $file_path ="G:/Server/videos/". $this->video_folder . $video_name;
+            echo $file_path;
             if (file_exists($file_path)) {
                 if (unlink($file_path)) {
                     echo json_encode(['success' => true]);
