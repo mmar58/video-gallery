@@ -1,4 +1,5 @@
-const API_URL = 'http://192.168.0.2:5000/api/videos';
+import { SOCKET_URL } from "./socket.js"
+const API_URL = `${SOCKET_URL}/api/videos`;
 
 export const api = {
     async fetchVideos(search = '', sort = 'name', page = 1, limit = 12, tag = '', days = '', dateFrom = '', dateTo = '') {
