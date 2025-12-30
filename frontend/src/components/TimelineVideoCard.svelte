@@ -12,6 +12,7 @@
         Ban,
         Image as ImageIcon,
         Info,
+        Heart,
     } from "lucide-svelte";
     import { toast } from "../stores/toastStore";
     import { logStore } from "../stores/logStore";
@@ -67,6 +68,11 @@
         const yPos = (row / (rows - 1)) * 100;
 
         previewBgPosition = `${xPos}% ${yPos}%`;
+    }
+
+    function handleLike(e) {
+        e.stopPropagation();
+        videoStore.toggleLike(video.name);
     }
 
     // --- Tag Logic ---
@@ -214,6 +220,21 @@
         <div
             class="absolute top-1 right-1 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-20"
         >
+            <!-- Like Button -->
+            <button
+                on:click={handleLike}
+                class="bg-black/60 p-1.5 rounded-full hover:bg-red-500/80 text-white backdrop-blur-sm transition flex items-center"
+                title={video.likes > 0 ? `${video.likes} Likes` : "Like"}
+            >
+                <Heart
+                    size={14}
+                    class={video.likes > 0 ? "fill-red-500 text-red-500" : ""}
+                />
+                {#if video.likes > 0}
+                    <span class="text-[10px] font-bold ml-1">{video.likes}</span
+                    >
+                {/if}
+            </button>
             <!-- Thumbnail Gen -->
             <button
                 on:click={generateThumbnail}

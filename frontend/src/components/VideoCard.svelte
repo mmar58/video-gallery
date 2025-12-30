@@ -292,13 +292,16 @@
         >
             <button
                 on:click={handleLike}
-                class="bg-black/60 p-2 rounded-full hover:bg-red-500/80 text-white backdrop-blur-sm transition"
-                title="Like"
+                class="bg-black/60 p-2 rounded-full hover:bg-red-500/80 text-white backdrop-blur-sm transition flex items-center"
+                title={video.likes > 0 ? `${video.likes} Likes` : "Like"}
             >
                 <Heart
                     size={16}
                     class={video.likes > 0 ? "fill-red-500 text-red-500" : ""}
                 />
+                {#if video.likes > 0}
+                    <span class="text-xs font-bold ml-1">{video.likes}</span>
+                {/if}
             </button>
             <button
                 on:click={handleAddTag}
