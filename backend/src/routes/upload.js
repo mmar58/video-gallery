@@ -5,14 +5,16 @@ const fs = require('fs');
 
 const router = express.Router();
 
+const config = require('../config');
+
 // Ensure uploads directory exists
-const uploadDir = path.join(__dirname, '../../../../assets/videos');
+const uploadDir = config.videosDir;
 if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
 }
 
 // Ensure thumbnails directory exists (standard convention from readme)
-const thumbnailDir = path.join(__dirname, '../../../../assets/thumbnails');
+const thumbnailDir = config.thumbnailsDir;
 if (!fs.existsSync(thumbnailDir)) {
     fs.mkdirSync(thumbnailDir, { recursive: true });
 }

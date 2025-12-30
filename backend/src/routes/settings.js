@@ -3,7 +3,9 @@ const router = express.Router();
 const fs = require('fs');
 const path = require('path');
 
-const BLACKLIST_FILE = path.join(__dirname, '../data/blacklist.json');
+const config = require('../config');
+
+const BLACKLIST_FILE = path.join(config.dataDir, 'blacklist.json');
 
 // Helper to read blacklist
 const getBlacklist = () => {

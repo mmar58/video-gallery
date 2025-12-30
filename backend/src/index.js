@@ -10,6 +10,7 @@ const settingsRoutes = require('./routes/settings');
 const thumbnailRoutes = require('./routes/thumbnails');
 const socketHandler = require('./socket');
 const { getModels } = require('./services/ollamaService');
+const config = require('./config');
 
 dotenv.config();
 
@@ -38,7 +39,8 @@ const setupVideoGallery = (app, serverOrIo) => {
 
     // Serve static assets (videos)
     // We use a resolved path relative to this file to ensure it works when imported from elsewhere
-    app.use('/assets', express.static(path.join(__dirname, '../../assets')));
+    // Serve static assets (videos)
+    app.use('/assets', express.static(config.assetsDir));
 
     // Routes
     app.use('/api/videos', videoRoutes);

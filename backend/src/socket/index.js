@@ -3,8 +3,10 @@ const path = require('path');
 const { generateTagsFromText } = require('../services/ollamaService');
 const store = require('../data/store');
 
-const VIDEO_DIR = path.join(__dirname, '../../../assets/videos');
-const BLACKLIST_FILE = path.join(__dirname, '../data/blacklist.json');
+const config = require('../config');
+
+const VIDEO_DIR = config.videosDir;
+const BLACKLIST_FILE = path.join(config.dataDir, 'blacklist.json');
 
 // Helper to get blacklist
 const getBlacklist = () => {
@@ -176,7 +178,7 @@ module.exports = (io) => {
                         // Ideally we should update service to accept 'force'. 
                         // For now we will rely on service's check. If user wants FORCE, we should probably delete the file before calling generate.
 
-                        const THUMB_DIR = path.join(__dirname, '../../../assets/thumbnails');
+                        const THUMB_DIR = config.thumbnailsDir;
                         const videoThumbDir = path.join(THUMB_DIR, video);
                         const tPath = path.join(videoThumbDir, 'thumbnail.jpg');
                         const pPath = path.join(videoThumbDir, 'preview.jpg');

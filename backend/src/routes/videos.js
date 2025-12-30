@@ -4,7 +4,9 @@ const fs = require('fs');
 const path = require('path');
 const store = require('../data/store');
 
-const VIDEO_DIR = path.join(__dirname, '../../../assets/videos');
+const config = require('../config');
+
+const VIDEO_DIR = config.videosDir;
 
 // Helper to get full path
 const getPath = (filename) => path.join(VIDEO_DIR, filename);

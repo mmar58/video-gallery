@@ -1,7 +1,9 @@
 const fs = require('fs');
 const path = require('path');
 
-const DATA_FILE = path.join(__dirname, '../../data/metadata.json');
+const config = require('../config');
+
+const DATA_FILE = path.join(config.dataDir, 'metadata.json');
 
 // Ensure data directory exists
 const dataDir = path.dirname(DATA_FILE);

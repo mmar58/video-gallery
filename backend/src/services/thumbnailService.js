@@ -5,8 +5,10 @@ const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
 
-const VIDEO_DIR = path.join(__dirname, '../../../assets/videos');
-const THUMBNAIL_DIR = path.join(__dirname, '../../../assets/thumbnails');
+const config = require('../config');
+
+const VIDEO_DIR = config.videosDir;
+const THUMBNAIL_DIR = config.thumbnailsDir;
 
 if (!fs.existsSync(THUMBNAIL_DIR)) {
     fs.mkdirSync(THUMBNAIL_DIR, { recursive: true });
