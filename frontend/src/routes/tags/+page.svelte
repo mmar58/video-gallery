@@ -4,12 +4,15 @@
     import { Trash2, Edit2, Ban, Search, Tag } from "lucide-svelte";
     import { fade } from "svelte/transition";
 
+    import BlacklistModal from "../../components/BlacklistModal.svelte";
+
     let tags = [];
     let loading = true;
     let searchQuery = "";
 
     // Rename Modal State
     let isRenameOpen = false;
+    let isBlacklistOpen = false;
     let tagToRename = null;
     let newTagName = "";
 
@@ -18,7 +21,7 @@
     async function loadTags() {
         loading = true;
         try {
-            tags = await api.fetchTags();
+            tags = await api.fetchTagsWithStats();
         } catch (e) {
             console.error(e);
         } finally {
@@ -100,6 +103,16 @@
             >
         </header>
 
+        <div class="flex justify-end mb-4">
+            <button
+                on:click={() => (isBlacklistOpen = true)}
+                class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-red-400 rounded flex items-center gap-2 transition"
+            >
+                <Ban size={18} />
+                Manage Global Blacklist
+            </button>
+        </div>
+
         <!-- Search -->
         <div class="mb-8 relative max-w-md">
             <Search
@@ -126,14 +139,18 @@
                     <div
                         class="bg-gray-800 rounded-lg p-4 border border-gray-700 flex justify-between items-center hover:border-gray-600 transition group"
                     >
-                        <div class="flex items-center gap-3 overflow-hidden">
+                        <div
+                            class="flex items-center gap-3 overflow-hidden flex-1"
+                        >
                             <span
                                 class="bg-gray-700 text-xs font-mono px-2 py-1 rounded-full text-gray-300 min-w-[2rem] text-center"
                             >
                                 {tag.count}
                             </span>
-                            <span class="font-medium truncate" title={tag.name}
-                                >{tag.name}</span
+                            <a
+                                href="/tags/{encodeURIComponent(tag.name)}"
+                                class="font-medium truncate hover:text-blue-400 transition"
+                                title={tag.name}>{tag.name}</a
                             >
                         </div>
 
@@ -201,3 +218,5 @@
         </div>
     </div>
 {/if}
+
+<BlacklistModal bind:isOpen={isBlacklistOpen} />

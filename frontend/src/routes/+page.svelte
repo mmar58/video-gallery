@@ -277,11 +277,18 @@
             >
                 Upload
             </a>
-            <button
-                on:click={() => (isBlacklistOpen = true)}
+            <a
+                href="/tags"
                 class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded flex items-center gap-2 transition"
             >
                 Tags
+            </a>
+            <button
+                on:click={() => (sortValue = "random")}
+                class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded flex items-center gap-2 transition"
+                title="Randomize Videos"
+            >
+                🎲
             </button>
             <button
                 on:click={() => (isAutoTagOpen = true)}

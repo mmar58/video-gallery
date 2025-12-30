@@ -2,7 +2,7 @@ const API_URL = 'http://192.168.0.2:5000/api/videos';
 
 export const api = {
     async fetchVideos(search = '', sort = 'name', page = 1, limit = 12, tag = '', days = '', dateFrom = '', dateTo = '') {
-        let query = `${API_URL}?search=${search}&sort=${sort}&page=${page}&limit=${limit}&tag=${tag}`;
+        let query = `${API_URL}?search=${encodeURIComponent(search)}&sort=${sort}&page=${page}&limit=${limit}&tag=${encodeURIComponent(tag)}`;
         if (days) query += `&days=${days}`;
         if (dateFrom) query += `&dateFrom=${dateFrom}`;
         if (dateTo) query += `&dateTo=${dateTo}`;
@@ -43,8 +43,15 @@ export const api = {
         return res.json();
     },
 
+    async fetchTagsWithStats() {
+        const baseUrl = API_URL.replace('/api/videos', '');
+        const res = await fetch(`${baseUrl}/api/tags`);
+        return res.json();
+    },
+
     async renameTag(oldTag, newName) {
-        const res = await fetch(`${API_URL}/tags/${encodeURIComponent(oldTag)}`, {
+        const baseUrl = API_URL.replace('/api/videos', '');
+        const res = await fetch(`${baseUrl}/api/tags/${encodeURIComponent(oldTag)}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ newName })
@@ -53,14 +60,16 @@ export const api = {
     },
 
     async deleteTag(tag) {
-        const res = await fetch(`${API_URL}/tags/${encodeURIComponent(tag)}`, {
+        const baseUrl = API_URL.replace('/api/videos', '');
+        const res = await fetch(`${baseUrl}/api/tags/${encodeURIComponent(tag)}`, {
             method: 'DELETE'
         });
         return res.json();
     },
 
     async blacklistTag(tag) {
-        const res = await fetch(`${API_URL}/tags/${encodeURIComponent(tag)}/blacklist`, {
+        const baseUrl = API_URL.replace('/api/videos', '');
+        const res = await fetch(`${baseUrl}/api/tags/${encodeURIComponent(tag)}/blacklist`, {
             method: 'POST'
         });
         return res.json();

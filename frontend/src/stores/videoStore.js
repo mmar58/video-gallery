@@ -12,6 +12,7 @@ function createVideoStore() {
         maxPage: 1,
         tags: [],        // Available tags
         stats: null,     // Date distribution stats
+        pagination: { total: 0, page: 1, limit: 12, totalPages: 1 },
         selectedTag: '', // Current filter
         days: '',
         dateFrom: '',
@@ -33,6 +34,7 @@ function createVideoStore() {
                 update(s => ({
                     ...s,
                     videos: videoData.videos,
+                    pagination: videoData.pagination,
                     maxPage: videoData.pagination.totalPages,
                     tags: tagsData,
                     stats: statsData,
@@ -61,6 +63,7 @@ function createVideoStore() {
                     update(s => ({
                         ...s,
                         videos: data.videos,
+                        pagination: data.pagination,
                         maxPage: data.pagination.totalPages,
                         loading: false
                     }));
