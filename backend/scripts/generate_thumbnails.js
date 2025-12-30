@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { generateThumbnail, generatePreview } = require('../src/services/thumbnailService');
+const { generateThumbnail, generatePreview, deleteThumbnail } = require('../src/services/thumbnailService');
 
 const VIDEO_DIR = path.join(__dirname, '../../assets/videos');
 
@@ -30,17 +30,8 @@ async function main() {
         process.stdout.write(`Processing [${percent}%] ${video}... `);
 
         try {
-            // We pass a "force" flag logic by deleting existing if needed, 
-            // but our service checks existance. 
-            // If force is true, we should probably manually check/delete here or update service using a force param.
-            // For now, let's just rely on the service check, or if force, delete first.
-
             if (force) {
-                // TODO: Add delete logic or update service to accept force
-                // For simplicity in this script, we'll assume service skips existing unless we delete them, 
-                // BUT the service logic I wrote earlier checks `fs.existsSync` inside. 
-                // So "force" effectively means we need to bypass that check or delete files here.
-                // Let's rely on standard behavior first.
+                deleteThumbnail(video);
             }
 
             // Generate Static

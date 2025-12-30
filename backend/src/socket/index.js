@@ -177,10 +177,13 @@ module.exports = (io) => {
                         // For now we will rely on service's check. If user wants FORCE, we should probably delete the file before calling generate.
 
                         const THUMB_DIR = path.join(__dirname, '../../../assets/thumbnails');
-                        const tPath = path.join(THUMB_DIR, `${video}.jpg`);
-                        const pPath = path.join(THUMB_DIR, `${video}_preview.jpg`);
+                        const videoThumbDir = path.join(THUMB_DIR, video);
+                        const tPath = path.join(videoThumbDir, 'thumbnail.jpg');
+                        const pPath = path.join(videoThumbDir, 'preview.jpg');
 
                         // Static
+                        // If force, we can just delete the whole folder? Or individual files?
+                        // Service will mkdir if needed.
                         if (force && fs.existsSync(tPath)) fs.unlinkSync(tPath);
                         await generateThumbnail(video);
 

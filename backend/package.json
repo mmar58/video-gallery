@@ -6,8 +6,8 @@
     "scripts": {
         "start": "node src/index.js",
         "dev": "nodemon src/index.js",
-        "script:thumb": "node scripts/generate_thumbnails.js",
-        "script:tag": "node scripts/generate_tags.js"
+        "thumb": "node scripts/generate_thumbnails.js",
+        "tag": "node scripts/generate_tags.js"
     },
     "keywords": [],
     "author": "",

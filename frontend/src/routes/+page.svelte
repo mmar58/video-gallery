@@ -289,10 +289,17 @@
             >
                 Auto Tag
             </button>
+            <button
+                on:click={() => (isAutoThumbnailOpen = true)}
+                class="px-4 py-2 bg-gradient-to-r from-orange-600 to-red-600 hover:opacity-90 text-white rounded flex items-center gap-2 transition font-medium"
+            >
+                Auto Thumbs
+            </button>
         </div>
     </div>
 
     <AutoTagModal bind:isOpen={isAutoTagOpen} />
+    <AutoThumbnailModal bind:isOpen={isAutoThumbnailOpen} />
     <BlacklistModal bind:isOpen={isBlacklistOpen} />
     <VideoDetailsModal bind:isOpen={isDetailsOpen} video={selectedVideo} />
 

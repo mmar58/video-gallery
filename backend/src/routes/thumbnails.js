@@ -7,7 +7,8 @@ const { generateThumbnail, deleteThumbnail, getThumbnailPath, generatePreview, g
 // Serve thumbnail file
 router.get('/:filename', (req, res) => {
     const { filename } = req.params;
-    const thumbnailPath = getThumbnailPath(filename);
+    const { index } = req.query; // Support ?index=1 etc.
+    const thumbnailPath = getThumbnailPath(filename, index);
 
     if (fs.existsSync(thumbnailPath)) {
         res.sendFile(thumbnailPath);
