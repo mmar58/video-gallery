@@ -10,8 +10,10 @@
         Filter,
         Edit2,
         Ban,
+        Image as ImageIcon,
     } from "lucide-svelte";
     import { toast } from "../stores/toastStore";
+    import { logStore } from "../stores/logStore";
 
     export let video;
 
@@ -74,6 +76,50 @@
 
     function filterByTag(tag) {
         goto(`/tags/${encodeURIComponent(tag)}`);
+    }
+
+    async function generateThumbnail(e) {
+        e.stopPropagation();
+        try {
+            toast.info(`Generating thumbnail for ${video.name}...`);
+            logStore.add(`Generating thumbnail for ${video.name}...`);
+            await api.generateThumbnail(video.name);
+
+            // Force refresh image
+            const img = e.currentTarget.closest(".group").querySelector("img");
+            if (img)
+                img.src = api.getThumbnailUrl(video.name) + "?t=" + Date.now();
+
+            toast.success("Thumbnail generated!");
+            logStore.add(`Thumbnail generated for ${video.name}`, "success");
+        } catch (err) {
+            toast.error("Failed to generate thumbnail");
+            logStore.add(
+                `Error generating thumbnail for ${video.name}: ${err.message}`,
+                "error",
+            );
+        }
+    }
+
+    async function generatePreview(e) {
+        e.stopPropagation();
+        try {
+            toast.info(`Generating preview for ${video.name}...`);
+            logStore.add(`Generating preview for ${video.name}...`);
+            await api.generatePreview(video.name);
+            toast.success("Preview generated!");
+            logStore.add(`Preview generated for ${video.name}`, "success");
+
+            // Force reload preview logic
+            previewLoaded = false;
+            triedLoadingPreview = false;
+        } catch (err) {
+            toast.error("Failed to generate preview");
+            logStore.add(
+                `Error generating preview for ${video.name}: ${err.message}`,
+                "error",
+            );
+        }
     }
 
     async function removeTagFromVideo(tag) {
@@ -162,6 +208,28 @@
                 <Play size={32} class="text-white fill-white" />
             </div>
         {/if}
+
+        <!-- Actions Overlay -->
+        <div
+            class="absolute top-1 right-1 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-20"
+        >
+            <!-- Thumbnail Gen -->
+            <button
+                on:click={generateThumbnail}
+                class="bg-black/60 p-1.5 rounded-full hover:bg-purple-500/80 text-white backdrop-blur-sm transition"
+                title="Generate Thumbnail"
+            >
+                <ImageIcon size={14} />
+            </button>
+            <!-- Preview Gen -->
+            <button
+                on:click={generatePreview}
+                class="bg-black/60 p-1.5 rounded-full hover:bg-orange-500/80 text-white backdrop-blur-sm transition"
+                title="Generate Animated Preview"
+            >
+                <ImageIcon size={14} class="text-orange-300" />
+            </button>
+        </div>
 
         <!-- Duration/Size Badge -->
         <div

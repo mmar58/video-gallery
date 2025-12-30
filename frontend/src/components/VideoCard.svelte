@@ -15,6 +15,8 @@
         Image as ImageIcon,
         Info,
     } from "lucide-svelte";
+    import { toast } from "../stores/toastStore";
+    import { logStore } from "../stores/logStore";
 
     export let video;
     export let hoverMode = "player"; // 'player' | 'preview'
@@ -134,13 +136,24 @@
     async function generateThumbnail(e) {
         e.stopPropagation();
         try {
+            toast.info(`Generating thumbnail for ${video.name}...`);
+            logStore.add(`Generating thumbnail for ${video.name}...`);
             await api.generateThumbnail(video.name);
             thumbnailError = false;
+
+            // Force refresh image
             const img = document.querySelector(`img[data-vid="${video.name}"]`);
             if (img)
                 img.src = api.getThumbnailUrl(video.name) + "?t=" + Date.now();
+
+            toast.success("Thumbnail generated!");
+            logStore.add(`Thumbnail generated for ${video.name}`, "success");
         } catch (err) {
-            alert("Failed to generate thumbnail");
+            toast.error("Failed to generate thumbnail");
+            logStore.add(
+                `Error generating thumbnail for ${video.name}: ${err.message}`,
+                "error",
+            );
         }
     }
 
@@ -186,12 +199,20 @@
     async function generatePreview(e) {
         e.stopPropagation();
         try {
+            toast.info(`Generating preview for ${video.name}...`);
+            logStore.add(`Generating preview for ${video.name}...`);
             await api.generatePreview(video.name);
             triedLoadingPreview = false;
             checkPreview();
-            alert("Preview generated! Hover to see effect.");
+
+            toast.success("Preview generated! Hover to see effect.");
+            logStore.add(`Preview generated for ${video.name}`, "success");
         } catch (err) {
-            alert("Failed to generate preview");
+            toast.error("Failed to generate preview");
+            logStore.add(
+                `Error generating preview for ${video.name}: ${err.message}`,
+                "error",
+            );
         }
     }
 </script>
