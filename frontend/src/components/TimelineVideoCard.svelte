@@ -11,6 +11,7 @@
         Edit2,
         Ban,
         Image as ImageIcon,
+        Info,
     } from "lucide-svelte";
     import { toast } from "../stores/toastStore";
     import { logStore } from "../stores/logStore";
@@ -228,6 +229,17 @@
                 title="Generate Animated Preview"
             >
                 <ImageIcon size={14} class="text-orange-300" />
+            </button>
+            <!-- Info -->
+            <button
+                on:click={(e) => {
+                    e.stopPropagation();
+                    dispatch("details", video);
+                }}
+                class="bg-black/60 p-1.5 rounded-full hover:bg-gray-500/80 text-white backdrop-blur-sm transition"
+                title="Video Details"
+            >
+                <Info size={14} />
             </button>
         </div>
 

@@ -58,4 +58,31 @@ router.post('/:filename/preview', async (req, res) => {
     }
 });
 
+// Get details of generated assets
+router.get('/:filename/details', (req, res) => {
+    const { filename } = req.params;
+    // We can deduce the directory from the default thumbnail path
+    const defaultThumbPath = getThumbnailPath(filename);
+    const dir = path.dirname(defaultThumbPath);
+
+    if (!fs.existsSync(dir)) {
+        return res.json({ assets: [] });
+    }
+
+    try {
+        const files = fs.readdirSync(dir);
+        const assets = files.map(file => {
+            const stats = fs.statSync(path.join(dir, file));
+            return {
+                name: file,
+                size: stats.size,
+                created: stats.birthtime
+            };
+        });
+        res.json({ assets });
+    } catch (e) {
+        res.status(500).json({ error: 'Failed to read asset details' });
+    }
+});
+
 module.exports = router;

@@ -156,5 +156,10 @@ export const api = {
 
     getStreamUrl(filename) {
         return `${API_URL}/${filename}/stream`;
+    },
+
+    async getAssetDetails(filename) {
+        const res = await fetch(`${API_URL.replace('/api/videos', '')}/api/thumbnails/${encodeURIComponent(filename)}/details`);
+        return await res.json();
     }
 };

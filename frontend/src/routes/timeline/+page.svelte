@@ -4,6 +4,7 @@
     import VideoCard from "../../components/VideoCard.svelte";
     import TimelineVideoCard from "../../components/TimelineVideoCard.svelte";
     import VideoPlayer from "../../components/VideoPlayer.svelte";
+    import VideoDetailsModal from "../../components/VideoDetailsModal.svelte";
 
     let videos = [];
     let groupedVideos = {}; // { 'YYYY-MM-DD': [videos] }
@@ -13,6 +14,10 @@
     let hasMore = true;
     let observer;
     let sentinel; // Bind to this element for scroll detection
+
+    // Details Modal State
+    let selectedVideo = null;
+    let isDetailsOpen = false;
 
     onMount(async () => {
         loadMore();
@@ -85,7 +90,8 @@
         videos = [...videos]; // trigger reactivity
     }
     function handleDetails(event) {
-        // Implement details modal if needed
+        selectedVideo = event.detail;
+        isDetailsOpen = true;
     }
 </script>
 
@@ -123,11 +129,11 @@
                         class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6"
                     >
                         {#each daysVideos as video (video.name)}
-                            <VideoCard
+                            <TimelineVideoCard
                                 {video}
-                                hoverMode="preview"
                                 on:play={handlePlay}
                                 on:refresh={handleRefresh}
+                                on:details={handleDetails}
                             />
                         {/each}
                     </div>
@@ -151,5 +157,11 @@
                 on:close={() => handleClosePlayer({ detail: video.id })}
             />
         {/each}
+
+        <VideoDetailsModal
+            bind:isOpen={isDetailsOpen}
+            video={selectedVideo}
+            on:refresh={handleRefresh}
+        />
     </div>
 </div>
