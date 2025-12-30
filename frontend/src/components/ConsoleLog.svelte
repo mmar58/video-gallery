@@ -32,23 +32,29 @@
             }
         });
 
-        // Optional: listen for completion
-        socket.on("tagging-complete", () => {
-            logs = [
-                ...logs,
-                {
-                    message: "Process finished.",
-                    type: "info",
-                    timestamp: new Date(),
-                },
-            ];
-            isRunning = false;
+        // Thumbnail Listeners
+        socket.on("thumbnail-status", (data) => {
+            isRunning = data.isGenerating;
+        });
+
+        socket.on("thumbnail-log", (log) => {
+            logs = [...logs, { ...log, timestamp: new Date() }];
+            if (!isOpen && (log.message.includes("Starting") || isMinimized)) {
+                if (isMinimized) isMinimized = false;
+            }
+            if (log.message.includes("Starting")) {
+                isOpen = true;
+                isMinimized = false;
+                isRunning = true;
+            }
         });
 
         return () => {
             socket.off("tagging-log");
             socket.off("tagging-complete");
             socket.off("tagging-status");
+            socket.off("thumbnail-log");
+            socket.off("thumbnail-status");
         };
     });
 
@@ -107,7 +113,10 @@
             <div class="flex items-center gap-1">
                 {#if isRunning}
                     <button
-                        on:click={() => socket.emit("stop-tagging")}
+                        on:click={() => {
+                            socket.emit("stop-tagging");
+                            socket.emit("stop-thumbnails");
+                        }}
                         class="px-2 py-0.5 bg-red-900/50 hover:bg-red-900 text-red-200 text-xs rounded border border-red-800 uppercase font-bold mr-2 tracking-wider transition"
                     >
                         Stop
