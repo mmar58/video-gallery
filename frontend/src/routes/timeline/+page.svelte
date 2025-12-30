@@ -1,5 +1,6 @@
 <script>
     import { onMount, tick } from "svelte";
+    import { base } from "$app/paths";
     import { api } from "$lib/api";
     import VideoCard from "../../components/VideoCard.svelte";
     import TimelineVideoCard from "../../components/TimelineVideoCard.svelte";
@@ -103,7 +104,7 @@
             >
                 Video Timeline
             </h1>
-            <a href="/" class="text-gray-400 hover:text-white underline"
+            <a href="{base}/" class="text-gray-400 hover:text-white underline"
                 >Back to Gallery</a
             >
         </header>

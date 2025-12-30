@@ -2,6 +2,7 @@
     import { onMount } from "svelte";
     import { page } from "$app/stores";
     import { goto } from "$app/navigation";
+    import { base } from "$app/paths";
     import { videoStore } from "../../../stores/videoStore";
     import { api } from "../../../lib/api";
     import VideoCard from "../../../components/VideoCard.svelte";
@@ -62,7 +63,7 @@
         if (newName && newName !== tag) {
             try {
                 await api.renameTag(tag, newName);
-                goto(`/tags/${encodeURIComponent(newName)}`);
+                goto(`${base}/tags/${encodeURIComponent(newName)}`);
             } catch (e) {
                 alert("Failed to rename tag");
             }
@@ -77,7 +78,7 @@
         ) {
             try {
                 await api.deleteTag(tag);
-                goto("/tags"); // Go back to tags list
+                goto(`${base}/tags`); // Go back to tags list
             } catch (e) {
                 alert("Failed to delete tag");
             }
@@ -92,7 +93,7 @@
         ) {
             try {
                 await api.blacklistTag(tag);
-                goto("/tags");
+                goto(`${base}/tags`);
             } catch (e) {
                 alert("Failed to blacklist tag");
             }
@@ -104,7 +105,7 @@
     <!-- Header -->
     <header class="max-w-7xl mx-auto mb-8 flex items-center gap-4">
         <a
-            href="/tags"
+            href="{base}/tags"
             class="p-2 bg-gray-800 rounded-full hover:bg-gray-700 transition"
         >
             <ArrowLeft size={24} />

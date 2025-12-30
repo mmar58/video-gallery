@@ -6,13 +6,13 @@ dotenv.config();
 const config = {
     // Determine the base path for assets.
     // By default, assuming we are running from src/, assets are in ../../assets
-    assetsDir: process.env.ASSETS_PATH || path.resolve(__dirname, '../../assets'),
+    assetsDir: "G:\\Server\\videos\\assets",
 
     // Data directory for JSON store
-    dataDir: process.env.DATA_PATH || path.resolve(__dirname, '../data'),
+    dataDir: "G:\\Server\\videos\\assets\\data",
 
     // Port definition
-    port: process.env.PORT || 3033
+    port: 3033
 };
 
 // Derived paths

@@ -1,5 +1,6 @@
 <script>
     import { onMount } from "svelte";
+    import { base } from "$app/paths";
     import { api } from "$lib/api";
     import { Trash2, Edit2, Ban, Search, Tag } from "lucide-svelte";
     import { fade } from "svelte/transition";
@@ -98,7 +99,7 @@
                     Tags Manager
                 </h1>
             </div>
-            <a href="/" class="text-gray-400 hover:text-white underline"
+            <a href="{base}/" class="text-gray-400 hover:text-white underline"
                 >Back to Gallery</a
             >
         </header>
@@ -148,7 +149,9 @@
                                 {tag.count}
                             </span>
                             <a
-                                href="/tags/{encodeURIComponent(tag.name)}"
+                                href="{base}/tags/{encodeURIComponent(
+                                    tag.name,
+                                )}"
                                 class="font-medium truncate hover:text-blue-400 transition"
                                 title={tag.name}>{tag.name}</a
                             >

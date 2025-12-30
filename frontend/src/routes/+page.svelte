@@ -2,6 +2,7 @@
     import { onMount, tick } from "svelte";
     import { goto } from "$app/navigation";
     import { page } from "$app/stores";
+    import { base } from "$app/paths";
     import { videoStore } from "../stores/videoStore";
     import VideoCard from "../components/VideoCard.svelte";
     import VideoPlayer from "../components/VideoPlayer.svelte";
@@ -70,7 +71,11 @@
         const url = queryString ? `?${queryString}` : "/";
 
         if ($page.url.search !== (queryString ? `?${queryString}` : "")) {
-            goto(url, { keepFocus: true, replaceState: true, noScroll: true });
+            goto(`${base}/${url}`, {
+                keepFocus: true,
+                replaceState: true,
+                noScroll: true,
+            });
         }
     }
 
@@ -266,19 +271,19 @@
         <!-- Action Buttons -->
         <div class="flex gap-3">
             <a
-                href="/timeline"
+                href="{base}/timeline"
                 class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded flex items-center gap-2 transition"
             >
                 Timeline
             </a>
             <a
-                href="/upload"
+                href="{base}/upload"
                 class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded flex items-center gap-2 transition"
             >
                 Upload
             </a>
             <a
-                href="/tags"
+                href="{base}/tags"
                 class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded flex items-center gap-2 transition"
             >
                 Tags

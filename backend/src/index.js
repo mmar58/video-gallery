@@ -42,6 +42,15 @@ const setupVideoGallery = (app, serverOrIo) => {
     // Serve static assets (videos)
     app.use('/assets', express.static(config.assetsDir));
 
+    // Serve Frontend
+    const frontendBuildPath = path.join(__dirname, '../../frontend/build');
+    app.use('/videos', express.static(frontendBuildPath));
+
+    // SPA Fallback for /videos routes
+    app.use('/videos/*', (req, res) => {
+        res.sendFile(path.join(frontendBuildPath, 'index.html'));
+    });
+
     // Routes
     app.use('/api/videos', videoRoutes);
     app.use('/api/upload', uploadRoutes);

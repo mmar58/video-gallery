@@ -1,6 +1,7 @@
 <script>
     import { createEventDispatcher } from "svelte";
     import { goto } from "$app/navigation";
+    import { base } from "$app/paths";
     import { videoStore } from "../stores/videoStore";
     import { api } from "../lib/api";
     import {
@@ -98,7 +99,7 @@
     }
 
     function filterByTag(tag) {
-        goto(`/tags/${encodeURIComponent(tag)}`);
+        goto(`${base}/tags/${encodeURIComponent(tag)}`);
     }
 
     async function removeTagFromVideo(tag) {
