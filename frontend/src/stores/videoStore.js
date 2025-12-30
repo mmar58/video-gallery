@@ -105,8 +105,10 @@ function createVideoStore() {
                     ...s,
                     videos: s.videos.map(v => v.name === filename ? { ...v, likes: meta.likes } : v)
                 }));
+                return meta;
             } catch (err) {
                 console.error(err);
+                throw err;
             }
         },
         rename: async (filename, newName) => {

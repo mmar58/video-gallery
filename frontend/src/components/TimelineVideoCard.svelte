@@ -70,9 +70,16 @@
         previewBgPosition = `${xPos}% ${yPos}%`;
     }
 
-    function handleLike(e) {
+    async function handleLike(e) {
         e.stopPropagation();
-        videoStore.toggleLike(video.name);
+        try {
+            const meta = await videoStore.toggleLike(video.name);
+            if (meta && typeof meta.likes === "number") {
+                video = { ...video, likes: meta.likes };
+            }
+        } catch (error) {
+            console.error(error);
+        }
     }
 
     // --- Tag Logic ---
