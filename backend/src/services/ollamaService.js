@@ -21,7 +21,7 @@ const getModels = async () => {
  * @param {string} text - The text context (filename)
  * @param {string} prompt - The system prompt
  */
-const generateTagsFromText = async (modelName, text, prompt = "Generate 5-10 relevant keywords or tags based on this text. Comma separated, no intro.") => {
+const generateTagsFromText = async (modelName, text, prompt = "Generate 5-10 relevant keywords or tags based on this text. Comma separated, no intro.", signal) => {
     try {
         const timeoutMs = 45000; // 45s timeout
 
@@ -33,6 +33,20 @@ const generateTagsFromText = async (modelName, text, prompt = "Generate 5-10 rel
         const timeoutPromise = new Promise((_, reject) =>
             setTimeout(() => reject(new Error('Ollama generation timed out')), timeoutMs)
         );
+
+        // Handle AbortSignal
+        if (signal) {
+            if (signal.aborted) throw new Error('Aborted');
+
+            // create a promise that rejects on abort signal to unblock the race immediately
+            const abortPromise = new Promise((_, reject) => {
+                signal.addEventListener('abort', () => reject(new Error('Aborted')));
+            });
+
+            // Race against generate, timeout, AND abort
+            const response = await Promise.race([generatePromise, timeoutPromise, abortPromise]);
+            return response.response;
+        }
 
         const response = await Promise.race([generatePromise, timeoutPromise]);
         return response.response;

@@ -8,16 +8,27 @@
     let isOpen = false;
     let isMinimized = true;
     let logContainer;
+    let isRunning = false;
 
     onMount(() => {
         connectSocket();
+
+        socket.on("tagging-status", (data) => {
+            isRunning = data.isTagging;
+        });
 
         socket.on("tagging-log", (log) => {
             logs = [...logs, { ...log, timestamp: new Date() }];
             // Auto open if it's a "Starting..." message or if closed
             if (!isOpen && (log.message.includes("Starting") || isMinimized)) {
+                if (isMinimized) isMinimized = false;
+                // Don't restart isOpen if user closed it, unless it's a fresh start?
+                // Let's just open it if minimized.
+            }
+            if (log.message.includes("Starting")) {
                 isOpen = true;
                 isMinimized = false;
+                isRunning = true;
             }
         });
 
@@ -31,11 +42,13 @@
                     timestamp: new Date(),
                 },
             ];
+            isRunning = false;
         });
 
         return () => {
             socket.off("tagging-log");
             socket.off("tagging-complete");
+            socket.off("tagging-status");
         };
     });
 
@@ -86,7 +99,7 @@
                 <span class="font-semibold">System Console</span>
             </div>
             <div class="flex items-center gap-1">
-                {#if logs.length > 0 && !logs[logs.length - 1].message.includes("complete") && !logs[logs.length - 1].message.includes("Stopped")}
+                {#if isRunning}
                     <button
                         on:click={() => socket.emit("stop-tagging")}
                         class="px-2 py-0.5 bg-red-900/50 hover:bg-red-900 text-red-200 text-xs rounded border border-red-800 uppercase font-bold mr-2 tracking-wider transition"
