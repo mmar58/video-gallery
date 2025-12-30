@@ -10,39 +10,68 @@ export const api = {
         const res = await fetch(query);
         return await res.json();
     },
-    async fetchTags() {
-        const res = await fetch(`${API_URL}/tags`);
-        return await res.json();
-    },
+
     async fetchStats() {
         const res = await fetch(`${API_URL}/stats`);
         return await res.json();
     },
+
     async fetchBlacklist() {
         const res = await fetch(`${API_URL.replace('/api/videos', '')}/api/settings/blacklist`);
         return await res.json();
     },
-    async addBlacklistWord(word) {
+
+    async blacklistWord(word) {
         const res = await fetch(`${API_URL.replace('/api/videos', '')}/api/settings/blacklist`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ word })
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ word }),
         });
-        return await res.json();
+        return res.json();
     },
+
     async removeBlacklistWord(word) {
         const res = await fetch(`${API_URL.replace('/api/videos', '')}/api/settings/blacklist/${word}`, {
             method: 'DELETE'
         });
         return await res.json();
     },
+
+    // --- Tags ---
+    async fetchTags() {
+        const res = await fetch(`${API_URL}/tags`);
+        return res.json();
+    },
+
+    async renameTag(oldTag, newName) {
+        const res = await fetch(`${API_URL}/tags/${encodeURIComponent(oldTag)}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ newName })
+        });
+        return res.json();
+    },
+
+    async deleteTag(tag) {
+        const res = await fetch(`${API_URL}/tags/${encodeURIComponent(tag)}`, {
+            method: 'DELETE'
+        });
+        return res.json();
+    },
+
+    async blacklistTag(tag) {
+        const res = await fetch(`${API_URL}/tags/${encodeURIComponent(tag)}/blacklist`, {
+            method: 'POST'
+        });
+        return res.json();
+    },
+
     async getModels() {
-        // API_URL is .../api/videos, we need .../api/ollama/models
-        // Base is http://192.168.0.2:5000
         const baseUrl = API_URL.replace('/api/videos', '');
         const res = await fetch(`${baseUrl}/api/ollama/models`);
         return await res.json();
     },
+
     async uploadVideo(formData, onProgress) {
         const baseUrl = API_URL.replace('/api/videos', '');
         return new Promise((resolve, reject) => {
@@ -69,6 +98,7 @@ export const api = {
             xhr.send(formData);
         });
     },
+
     async addTag(filename, tag) {
         const res = await fetch(`${API_URL}/${filename}/tags`, {
             method: 'POST',
@@ -77,6 +107,7 @@ export const api = {
         });
         return await res.json();
     },
+
     async removeTag(filename, tag) {
         const res = await fetch(`${API_URL}/${filename}/tags/${tag}`, {
             method: 'DELETE'
@@ -103,6 +134,24 @@ export const api = {
         const res = await fetch(`${API_URL}/${filename}`, { method: 'DELETE' });
         if (!res.ok) throw new Error('Delete failed');
         return await res.json();
+    },
+
+    async getThumbnailUrl(filename) {
+        return `${API_URL.replace('/api/videos', '')}/api/thumbnails/${encodeURIComponent(filename)}`;
+    },
+
+    async generateThumbnail(filename) {
+        const res = await fetch(`${API_URL.replace('/api/videos', '')}/api/thumbnails/${encodeURIComponent(filename)}`, { method: 'POST' });
+        return await res.json();
+    },
+
+    async generatePreview(filename) {
+        const res = await fetch(`${API_URL.replace('/api/videos', '')}/api/thumbnails/${encodeURIComponent(filename)}/preview`, { method: 'POST' });
+        return await res.json();
+    },
+
+    getPreviewUrl(filename) {
+        return `${API_URL.replace('/api/videos', '')}/api/thumbnails/${encodeURIComponent(filename)}/preview`;
     },
 
     getStreamUrl(filename) {

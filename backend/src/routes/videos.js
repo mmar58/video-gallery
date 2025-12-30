@@ -167,6 +167,8 @@ router.put('/:filename', (req, res) => {
     });
 });
 
+const { deleteThumbnail } = require('../services/thumbnailService');
+
 // DELETE /api/videos/:filename - Delete video
 router.delete('/:filename', (req, res) => {
     const filePath = getPath(req.params.filename);
@@ -177,6 +179,10 @@ router.delete('/:filename', (req, res) => {
 
         // Sync metadata
         store.delete(req.params.filename);
+
+        // Remove thumbnail
+        deleteThumbnail(req.params.filename);
+
         res.json({ success: true });
     });
 });

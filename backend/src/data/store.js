@@ -52,5 +52,41 @@ module.exports = {
             delete metadata[filename];
             save();
         }
+    },
+
+    removeTagFromAll: (tagToRemove) => {
+        let modified = false;
+        const lowerTag = tagToRemove.toLowerCase();
+
+        Object.keys(metadata).forEach(filename => {
+            const entry = metadata[filename];
+            if (entry.tags && entry.tags.length > 0) {
+                const initialLength = entry.tags.length;
+                entry.tags = entry.tags.filter(t => t.toLowerCase() !== lowerTag);
+                if (entry.tags.length !== initialLength) modified = true;
+            }
+        });
+
+        if (modified) save();
+    },
+
+    renameTagInAll: (oldTag, newTag) => {
+        let modified = false;
+        const lowerOld = oldTag.toLowerCase();
+
+        Object.keys(metadata).forEach(filename => {
+            const entry = metadata[filename];
+            if (entry.tags) {
+                const index = entry.tags.findIndex(t => t.toLowerCase() === lowerOld);
+                if (index !== -1) {
+                    entry.tags[index] = newTag;
+                    // Remove duplicates if newTag already existed
+                    entry.tags = [...new Set(entry.tags)];
+                    modified = true;
+                }
+            }
+        });
+
+        if (modified) save();
     }
 };

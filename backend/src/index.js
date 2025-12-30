@@ -7,6 +7,7 @@ const { Server } = require('socket.io');
 const videoRoutes = require('./routes/videos');
 const uploadRoutes = require('./routes/upload');
 const settingsRoutes = require('./routes/settings');
+const thumbnailRoutes = require('./routes/thumbnails');
 const socketHandler = require('./socket');
 const { getModels } = require('./services/ollamaService');
 
@@ -34,6 +35,8 @@ app.use('/assets', express.static(path.join(__dirname, '../../assets')));
 app.use('/api/videos', videoRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/tags', require('./routes/tags'));
+app.use('/api/thumbnails', thumbnailRoutes); // Added route
 
 // Ollama models endpoint
 app.get('/api/ollama/models', async (req, res) => {

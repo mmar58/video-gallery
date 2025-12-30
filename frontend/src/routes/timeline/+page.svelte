@@ -1,8 +1,8 @@
 <script>
     import { onMount } from "svelte";
     import { api } from "$lib/api";
-    import VideoCard from "../components/VideoCard.svelte";
-    import VideoPlayer from "../components/VideoPlayer.svelte";
+    import VideoCard from "../../components/VideoCard.svelte";
+    import VideoPlayer from "../../components/VideoPlayer.svelte";
 
     let videos = [];
     let loading = true;

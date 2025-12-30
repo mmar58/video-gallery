@@ -129,5 +129,87 @@ module.exports = (io) => {
             socket.isTagging = false;
             console.log('Client disconnected:', socket.id);
         });
+
+        // --- Auto Thumbnail Socket Logic ---
+        socket.on('stop-thumbnails', () => {
+            socket.isGeneratingThumbnails = false;
+            socket.emit('thumbnail-log', { message: 'Stopping...', type: 'warning' });
+            socket.emit('thumbnail-status', { isGenerating: false });
+        });
+
+        socket.on('start-thumbnails', async (data) => {
+            if (socket.isGeneratingThumbnails) return;
+
+            socket.isGeneratingThumbnails = true;
+            socket.emit('thumbnail-status', { isGenerating: true });
+            socket.emit('thumbnail-log', { message: 'Starting thumbnail generation...', type: 'info' });
+
+            const { force, previews } = data || {};
+            const { generateThumbnail, generatePreview } = require('../services/thumbnailService');
+
+            try {
+                if (!fs.existsSync(VIDEO_DIR)) {
+                    socket.emit('thumbnail-log', { message: 'Video directory not found!', type: 'error' });
+                    return;
+                }
+
+                const files = fs.readdirSync(VIDEO_DIR);
+                const videos = files.filter(file => {
+                    const ext = path.extname(file).toLowerCase();
+                    return ['.mp4', '.webm', '.ogg', '.mov'].includes(ext);
+                });
+
+                socket.emit('thumbnail-log', { message: `Found ${videos.length} videos.`, type: 'info' });
+
+                for (const [index, video] of videos.entries()) {
+                    if (!socket.isGeneratingThumbnails) break;
+
+                    const percent = Math.round(((index + 1) / videos.length) * 100);
+                    socket.emit('thumbnail-progress', percent);
+                    socket.emit('thumbnail-log', { message: `Processing ${video}...`, type: 'info' });
+
+                    try {
+                        // 1. Static Thumbnail
+                        // By default service checks existence. If "force" is true, we might need to delete first or just rely on overwrite if service supports it.
+                        // Impl: create logic to skip if exists and !force
+                        // ... Since we can't easily peek into service, let's just call it. Service currently checks fs.existsSync.
+                        // Ideally we should update service to accept 'force'. 
+                        // For now we will rely on service's check. If user wants FORCE, we should probably delete the file before calling generate.
+
+                        const THUMB_DIR = path.join(__dirname, '../../../assets/thumbnails');
+                        const tPath = path.join(THUMB_DIR, `${video}.jpg`);
+                        const pPath = path.join(THUMB_DIR, `${video}_preview.jpg`);
+
+                        // Static
+                        if (force && fs.existsSync(tPath)) fs.unlinkSync(tPath);
+                        await generateThumbnail(video);
+
+                        // Preview
+                        if (previews) {
+                            if (force && fs.existsSync(pPath)) fs.unlinkSync(pPath);
+                            await generatePreview(video);
+                        }
+
+                        socket.emit('thumbnail-log', { message: `Generated for ${video}`, type: 'success' });
+                    } catch (err) {
+                        socket.emit('thumbnail-log', { message: `Error: ${err.message}`, type: 'error' });
+                    }
+
+                    // Small delay
+                    await new Promise(r => setTimeout(r, 100));
+                }
+
+                if (socket.isGeneratingThumbnails) {
+                    socket.emit('thumbnail-log', { message: 'Thumbnail generation complete!', type: 'success' });
+                }
+
+            } catch (err) {
+                console.error(err);
+                socket.emit('thumbnail-log', { message: 'Fatal error', type: 'error' });
+            } finally {
+                socket.isGeneratingThumbnails = false;
+                socket.emit('thumbnail-status', { isGenerating: false });
+            }
+        });
     });
 };

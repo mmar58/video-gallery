@@ -6,10 +6,17 @@
     import VideoCard from "../components/VideoCard.svelte";
     import VideoPlayer from "../components/VideoPlayer.svelte";
     import AutoTagModal from "../components/AutoTagModal.svelte";
+    import AutoThumbnailModal from "../components/AutoThumbnailModal.svelte";
     import BlacklistModal from "../components/BlacklistModal.svelte";
+    import VideoDetailsModal from "../components/VideoDetailsModal.svelte";
 
     let isAutoTagOpen = false;
+    let isAutoThumbnailOpen = false;
     let isBlacklistOpen = false;
+    let isDetailsOpen = false;
+    let selectedVideo = null;
+
+    // Malformed code removed
 
     let searchValue = "";
     let sortValue = "name";
@@ -75,6 +82,11 @@
         const video = event.detail;
         const id = Date.now() + Math.random();
         activeVideos = [...activeVideos, { ...video, id, zIndex: ++topZIndex }];
+    }
+
+    function handleDetails(event) {
+        selectedVideo = event.detail;
+        isDetailsOpen = true;
     }
 
     function handleClosePlayer(event) {
@@ -282,6 +294,7 @@
 
     <AutoTagModal bind:isOpen={isAutoTagOpen} />
     <BlacklistModal bind:isOpen={isBlacklistOpen} />
+    <VideoDetailsModal bind:isOpen={isDetailsOpen} video={selectedVideo} />
 
     <!-- Video Grid -->
     <main class="max-w-7xl mx-auto pb-20">
@@ -302,6 +315,7 @@
                         {video}
                         on:play={handlePlay}
                         on:refresh={handleRefresh}
+                        on:details={handleDetails}
                     />
                 {/each}
             </div>
