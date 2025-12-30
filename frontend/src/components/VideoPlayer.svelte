@@ -54,8 +54,8 @@
 
 <div
   bind:this={containerEl}
-  class="fixed shadow-2xl rounded-lg bg-gray-900 border border-gray-700 flex flex-col overflow-hidden resize-both"
-  style="left: {left}px; top: {top}px; width: 640px; z-index: {zIndex}; resize: both; overflow: auto; min-width: 320px;"
+  class="fixed shadow-2xl rounded-lg bg-gray-900 border border-gray-700 flex flex-col overflow-hidden player-window"
+  style="left: {left}px; top: {top}px; z-index: {zIndex};"
   on:mousedown={handleMouseDown}
 >
   <!-- Header / Drag Handle -->
@@ -88,11 +88,35 @@
 </div>
 
 <style>
-  /* Hide scrollbars for the resize container */
-  .resize-both::-webkit-scrollbar {
+  .player-window {
+    width: 640px;
+    min-width: 320px;
+    resize: both;
+    overflow: auto;
+  }
+
+  /* Mobile Fullscreen */
+  @media (max-width: 768px) {
+    .player-window {
+      position: fixed !important;
+      top: 0 !important;
+      left: 0 !important;
+      width: 100% !important;
+      height: 100% !important;
+      resize: none !important;
+      border-radius: 0 !important;
+      z-index: 10000 !important; /* Ensure it's on top */
+    }
+    /* Hide drag cursor on mobile */
+    .drag-handle {
+      cursor: default;
+    }
+  }
+
+  .player-window::-webkit-scrollbar {
     display: none;
   }
-  .resize-both {
+  .player-window {
     -ms-overflow-style: none;
     scrollbar-width: none;
   }

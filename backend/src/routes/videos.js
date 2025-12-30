@@ -162,4 +162,90 @@ router.delete('/:filename', (req, res) => {
     });
 });
 
+// GET /api/videos/tags - Get all unique tags (Specific route before parameters ideally, but safe here due to different methods/paths)
+router.get('/tags', (req, res) => {
+    const allData = store.getAll();
+    const tags = new Set();
+    Object.values(allData).forEach(meta => {
+        if (meta.tags && Array.isArray(meta.tags)) {
+            meta.tags.forEach(tag => tags.add(tag));
+        }
+    });
+    res.json(Array.from(tags).sort());
+});
+
+// POST /api/videos/:filename/tags - Add tag
+router.post('/:filename/tags', (req, res) => {
+    const { tag } = req.body;
+    if (!tag) return res.status(400).json({ error: 'Tag is required' });
+
+    const currentData = store.get(req.params.filename);
+    const currentTags = currentData.tags || [];
+
+    if (!currentTags.includes(tag)) {
+        const meta = store.update(req.params.filename, {
+            tags: [...currentTags, tag]
+        });
+        res.json(meta);
+    } else {
+        res.json(currentData);
+    }
+});
+
+// DELETE /api/videos/:filename/tags/:tag - Remove tag
+router.delete('/:filename/tags/:tag', (req, res) => {
+    const { tag } = req.params;
+    const currentData = store.get(req.params.filename);
+    const currentTags = currentData.tags || [];
+
+    const newTags = currentTags.filter(t => t !== tag);
+    const meta = store.update(req.params.filename, {
+        tags: newTags
+    });
+    res.json(meta);
+});
+
+// GET /api/tags - Get all unique tags
+router.get('/tags', (req, res) => {
+    const allData = store.getAll();
+    const tags = new Set();
+    Object.values(allData).forEach(meta => {
+        if (meta.tags && Array.isArray(meta.tags)) {
+            meta.tags.forEach(tag => tags.add(tag));
+        }
+    });
+    res.json(Array.from(tags).sort());
+});
+
+// POST /api/videos/:filename/tags - Add tag
+router.post('/:filename/tags', (req, res) => {
+    const { tag } = req.body;
+    if (!tag) return res.status(400).json({ error: 'Tag is required' });
+
+    const currentData = store.get(req.params.filename);
+    const currentTags = currentData.tags || [];
+
+    if (!currentTags.includes(tag)) {
+        const meta = store.update(req.params.filename, {
+            tags: [...currentTags, tag]
+        });
+        res.json(meta);
+    } else {
+        res.json(currentData);
+    }
+});
+
+// DELETE /api/videos/:filename/tags/:tag - Remove tag
+router.delete('/:filename/tags/:tag', (req, res) => {
+    const { tag } = req.params;
+    const currentData = store.get(req.params.filename);
+    const currentTags = currentData.tags || [];
+
+    const newTags = currentTags.filter(t => t !== tag);
+    const meta = store.update(req.params.filename, {
+        tags: newTags
+    });
+    res.json(meta);
+});
+
 module.exports = router;

@@ -41,13 +41,20 @@
         }
     }
 
-    function handleRename(e) {
+    function handleAddTag(e) {
         e.stopPropagation();
-        const newName = prompt("New name:", video.name);
-        if (newName && newName !== video.name) {
-            videoStore.rename(video.name, newName).then(() => {
-                dispatch("refresh");
+        const tag = prompt("Enter new tag:");
+        if (tag) {
+            videoStore.addTag(video.name, tag).then(() => {
+                dispatch("refresh"); // Optional, store updates automatically
             });
+        }
+    }
+
+    function handleRemoveTag(e, tag) {
+        e.stopPropagation();
+        if (confirm(`Remove tag "${tag}"?`)) {
+            videoStore.removeTag(video.name, tag);
         }
     }
 </script>
@@ -89,6 +96,13 @@
                 ♥ {video.likes || 0}
             </button>
             <button
+                on:click={handleAddTag}
+                class="bg-black/50 p-2 rounded-full hover:bg-green-500/80 text-white"
+                title="Add Tag"
+            >
+                +
+            </button>
+            <button
                 on:click={handleRename}
                 class="bg-black/50 p-2 rounded-full hover:bg-blue-500/80 text-white"
                 title="Rename"
@@ -110,13 +124,16 @@
         <h3 class="text-white text-sm font-medium truncate" title={video.name}>
             {video.name}
         </h3>
-        <!-- Tags placeholder -->
+        <!-- Tags -->
         {#if video.tags && video.tags.length > 0}
             <div class="flex flex-wrap gap-1 mt-1">
                 {#each video.tags as tag}
+                    <!-- svelte-ignore a11y-click-events-have-key-events -->
                     <span
-                        class="text-[10px] bg-gray-700 text-gray-300 px-1 rounded"
-                        >{tag}</span
+                        class="text-[10px] bg-gray-700 text-gray-300 px-1 rounded hover:bg-red-900 cursor-context-menu"
+                        on:contextmenu|preventDefault={(e) =>
+                            handleRemoveTag(e, tag)}
+                        title="Right click to remove">{tag}</span
                     >
                 {/each}
             </div>

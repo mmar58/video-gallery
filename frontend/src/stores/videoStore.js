@@ -9,19 +9,26 @@ function createVideoStore() {
         sort: 'name',
         search: '',
         page: 1,
-        maxPage: 1
+        maxPage: 1,
+        tags: [],        // Available tags
+        selectedTag: ''  // Current filter
     });
 
     return {
         subscribe,
-        load: async (search = '', sort = 'name', page = 1) => {
-            update(s => ({ ...s, loading: true, search, sort, page }));
+        load: async (search = '', sort = 'name', page = 1, tag = '') => {
+            update(s => ({ ...s, loading: true, search, sort, page, selectedTag: tag }));
             try {
-                const data = await api.fetchVideos(search, sort, page);
+                const [videoData, tagsData] = await Promise.all([
+                    api.fetchVideos(search, sort, page, 12, tag),
+                    api.fetchTags()
+                ]);
+
                 update(s => ({
                     ...s,
-                    videos: data.videos,
-                    maxPage: data.pagination.totalPages,
+                    videos: videoData.videos,
+                    maxPage: videoData.pagination.totalPages,
+                    tags: tagsData,
                     loading: false
                 }));
             } catch (err) {
@@ -60,6 +67,40 @@ function createVideoStore() {
                 .catch(err => {
                     update(s => ({ ...s, error: err.message, loading: false }));
                 });
+        },
+        setTag: (tag) => {
+            update(s => {
+                if (tag === s.selectedTag) return s;
+                // Trigger load with new tag
+                // (Ideally we call load directly like in setPage fix, but for now we trust the component to react or we just update state and let auto-loader handle it?)
+                // In page.svelte we have $: videoStore.load(...) reactive statement. 
+                // If we update s.selectedTag here, does +page.svelte trigger load? 
+                // +page.svelte listens to searchValue, sortValue variables, NOT the store state directly for parameters. 
+                // So we should just update the store state AND trigger reload.
+                return { ...s, selectedTag: tag, page: 1 };
+            });
+            // We need to actually trigger the fetch. 
+            // Since +page.svelte controls the load via reactive vars, maybe we should just expose a method to update state?
+            // Or better: The store should be the source of truth.
+        },
+        addTag: async (filename, tag) => {
+            try {
+                const meta = await api.addTag(filename, tag);
+                update(s => ({
+                    ...s,
+                    videos: s.videos.map(v => v.name === filename ? { ...v, tags: meta.tags || [] } : v),
+                    tags: s.tags.includes(tag) ? s.tags : [...s.tags, tag].sort()
+                }));
+            } catch (e) { console.error(e); }
+        },
+        removeTag: async (filename, tag) => {
+            try {
+                const meta = await api.removeTag(filename, tag);
+                update(s => ({
+                    ...s,
+                    videos: s.videos.map(v => v.name === filename ? { ...v, tags: meta.tags || [] } : v)
+                }));
+            } catch (e) { console.error(e); }
         },
         toggleLike: async (filename) => {
             try {
