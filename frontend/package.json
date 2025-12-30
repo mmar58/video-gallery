@@ -27,6 +27,9 @@
 		"vite": "^7.2.6"
 	},
 	"dependencies": {
+		"lucide-svelte": "^0.562.0",
+		"ollama": "^0.6.3",
+		"socket.io-client": "^4.8.3",
 		"tailwindcss": "^4.1.18"
 	}
 }

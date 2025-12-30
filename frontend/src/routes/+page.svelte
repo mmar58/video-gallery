@@ -5,10 +5,17 @@
     import { videoStore } from "../stores/videoStore";
     import VideoCard from "../components/VideoCard.svelte";
     import VideoPlayer from "../components/VideoPlayer.svelte";
+    import AutoTagModal from "../components/AutoTagModal.svelte";
+    import BlacklistModal from "../components/BlacklistModal.svelte";
+
+    let isAutoTagOpen = false;
+    let isBlacklistOpen = false;
 
     let searchValue = "";
     let sortValue = "name";
     let tagValue = "";
+    let dateFrom = "";
+    let dateTo = "";
     let isMounted = false;
 
     // Initialize from URL
@@ -30,7 +37,15 @@
     $: if (isMounted) {
         // Triggers when searchValue, sortValue, or tagValue changes
         // This is safe because it doesn't depend on store state
-        videoStore.load(searchValue, sortValue, 1, tagValue);
+        videoStore.load(
+            searchValue,
+            sortValue,
+            1,
+            tagValue,
+            "",
+            dateFrom,
+            dateTo,
+        );
     }
 
     // React to Store Changes -> Sync URL
@@ -99,6 +114,32 @@
                 class="bg-gray-800 border border-gray-700 rounded px-4 py-2 focus:outline-none focus:border-red-500 w-full md:w-64"
             />
 
+            <!-- Date Range Picker -->
+            <div class="flex items-center gap-2">
+                <input
+                    type="date"
+                    bind:value={dateFrom}
+                    class="bg-gray-800 border border-gray-700 rounded px-2 py-2 text-sm focus:border-red-500 text-white placeholder-gray-500"
+                    placeholder="From"
+                />
+                <span class="text-gray-500">-</span>
+                <input
+                    type="date"
+                    bind:value={dateTo}
+                    class="bg-gray-800 border border-gray-700 rounded px-2 py-2 text-sm focus:border-red-500 text-white placeholder-gray-500"
+                    placeholder="To"
+                />
+                {#if dateFrom || dateTo}
+                    <button
+                        class="text-xs text-red-500 hover:text-red-400"
+                        on:click={() => {
+                            dateFrom = "";
+                            dateTo = "";
+                        }}>Clear</button
+                    >
+                {/if}
+            </div>
+
             <!-- Tag Filter -->
             <select
                 bind:value={tagValue}
@@ -121,6 +162,126 @@
             </select>
         </div>
     </header>
+
+    <div class="max-w-7xl mx-auto mb-4 space-y-4">
+        <!-- Dynamic Stats Chips -->
+        {#if $videoStore.stats && $videoStore.stats.distributions}
+            <div class="flex flex-wrap gap-2 items-center">
+                <span class="text-sm text-gray-400 mr-2">Overview:</span>
+                {#each Object.entries($videoStore.stats.distributions)
+                    .sort()
+                    .reverse()
+                    .slice(0, 6) as [month, count]}
+                    <button
+                        class="px-3 py-1 bg-gray-800 border border-gray-700 rounded-full text-xs hover:bg-gray-700 hover:border-blue-500 transition flex items-center gap-2"
+                        on:click={() => {
+                            // Month is 'YYYY-MM'
+                            const [y, m] = month.split("-");
+                            const start = new Date(
+                                parseInt(y),
+                                parseInt(m) - 1,
+                                1,
+                            );
+                            const end = new Date(parseInt(y), parseInt(m), 0);
+                            // Set manual dates to trigger filter
+                            dateFrom = start.toISOString().split("T")[0];
+                            dateTo = end.toISOString().split("T")[0];
+                        }}
+                    >
+                        <span class="text-gray-300"
+                            >{new Date(month + "-02").toLocaleString(
+                                "default",
+                                { month: "short", year: "2-digit" },
+                            )}</span
+                        >
+                        <span
+                            class="bg-gray-700 text-gray-400 px-1.5 rounded-full text-[10px]"
+                            >{count}</span
+                        >
+                    </button>
+                {/each}
+            </div>
+        {/if}
+    </div>
+
+    <div
+        class="max-w-7xl mx-auto mb-8 flex flex-wrap gap-4 items-center justify-between"
+    >
+        <!-- Quick Date Filters -->
+        <div class="flex gap-2 items-center flex-wrap">
+            <span class="text-sm text-gray-400 mr-2">Quick Jump:</span>
+            <button
+                class="px-3 py-1 bg-gray-800 rounded text-sm hover:bg-gray-700 transition"
+                on:click={() =>
+                    videoStore.load(searchValue, sortValue, 1, tagValue, "15")}
+                >1-15 Days</button
+            >
+            <button
+                class="px-3 py-1 bg-gray-800 rounded text-sm hover:bg-gray-700 transition"
+                on:click={() =>
+                    videoStore.load(searchValue, sortValue, 1, tagValue, "30")}
+                >1-30 Days</button
+            >
+            <button
+                class="px-3 py-1 bg-gray-800 rounded text-sm hover:bg-gray-700 transition"
+                on:click={() => {
+                    const now = new Date();
+                    const firstDayPrevMonth = new Date(
+                        now.getFullYear(),
+                        now.getMonth() - 1,
+                        1,
+                    );
+                    const lastDayPrevMonth = new Date(
+                        now.getFullYear(),
+                        now.getMonth(),
+                        0,
+                    );
+                    // Update variables to trigger reactive load and sync UI
+                    dateFrom = firstDayPrevMonth.toISOString().split("T")[0];
+                    dateTo = lastDayPrevMonth.toISOString().split("T")[0];
+                }}>Previous Month</button
+            >
+            <button
+                class="px-3 py-1 bg-gray-800 rounded text-sm hover:bg-gray-700 transition text-red-400"
+                on:click={() => {
+                    dateFrom = "";
+                    dateTo = "";
+                    videoStore.load(searchValue, sortValue, 1, tagValue); // Explicit reset for days='15' cases too
+                }}>Clear Date</button
+            >
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex gap-3">
+            <a
+                href="/timeline"
+                class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded flex items-center gap-2 transition"
+            >
+                Timeline
+            </a>
+            <a
+                href="/upload"
+                class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded flex items-center gap-2 transition"
+            >
+                Upload
+            </a>
+            <button
+                on:click={() => (isBlacklistOpen = true)}
+                class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded flex items-center gap-2 transition"
+            >
+                Tags
+            </button>
+            <button
+                on:click={() => (isAutoTagOpen = true)}
+                class="px-4 py-2 bg-gradient-to-r from-red-600 to-purple-600 hover:opacity-90 text-white rounded flex items-center gap-2 transition font-medium"
+            >
+                Auto Tag
+            </button>
+        </div>
+    </div>
+
+    <AutoTagModal bind:isOpen={isAutoTagOpen} />
+    <BlacklistModal bind:isOpen={isBlacklistOpen} />
 
     <!-- Video Grid -->
     <main class="max-w-7xl mx-auto pb-20">

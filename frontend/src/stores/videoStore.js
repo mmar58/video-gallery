@@ -11,17 +11,23 @@ function createVideoStore() {
         page: 1,
         maxPage: 1,
         tags: [],        // Available tags
-        selectedTag: ''  // Current filter
+        stats: null,     // Date distribution stats
+        selectedTag: '', // Current filter
+        days: '',
+        dateFrom: '',
+        dateTo: ''
     });
 
     return {
         subscribe,
-        load: async (search = '', sort = 'name', page = 1, tag = '') => {
-            update(s => ({ ...s, loading: true, search, sort, page, selectedTag: tag }));
+        load: async (search = '', sort = 'name', page = 1, tag = '', days = '', dateFrom = '', dateTo = '') => {
+            update(s => ({ ...s, loading: true, search, sort, page, selectedTag: tag, days, dateFrom, dateTo }));
             try {
-                const [videoData, tagsData] = await Promise.all([
-                    api.fetchVideos(search, sort, page, 12, tag),
-                    api.fetchTags()
+                // Fetch stats generally once or refresh
+                const [videoData, tagsData, statsData] = await Promise.all([
+                    api.fetchVideos(search, sort, page, 12, tag, days, dateFrom, dateTo),
+                    api.fetchTags(),
+                    api.fetchStats()
                 ]);
 
                 update(s => ({
@@ -29,6 +35,7 @@ function createVideoStore() {
                     videos: videoData.videos,
                     maxPage: videoData.pagination.totalPages,
                     tags: tagsData,
+                    stats: statsData,
                     loading: false
                 }));
             } catch (err) {
@@ -45,17 +52,11 @@ function createVideoStore() {
 
             // Trigger load logic (which updates store)
             // We reuse the load function logic here to avoid duplication or circular dependency
-            const { search, sort } = currentState;
+            const { search, sort, selectedTag, days, dateFrom, dateTo } = currentState;
 
-            // Call the load method defined above (we need to capture it or just invoke update logic directly)
-            // Since `load` is part of the return object, we can't call it easily from here without defining it outside.
-            // Let's just re-implement the fetch call for now or refactor. 
-            // Better: define `loadVideos` helper inside createVideoStore.
-
-            // ... actually, the cleanest quick fix without big refactor:
             update(s => ({ ...s, loading: true, page }));
 
-            api.fetchVideos(search, sort, page)
+            api.fetchVideos(search, sort, page, 12, selectedTag, days, dateFrom, dateTo)
                 .then(data => {
                     update(s => ({
                         ...s,
@@ -71,17 +72,9 @@ function createVideoStore() {
         setTag: (tag) => {
             update(s => {
                 if (tag === s.selectedTag) return s;
-                // Trigger load with new tag
-                // (Ideally we call load directly like in setPage fix, but for now we trust the component to react or we just update state and let auto-loader handle it?)
-                // In page.svelte we have $: videoStore.load(...) reactive statement. 
-                // If we update s.selectedTag here, does +page.svelte trigger load? 
-                // +page.svelte listens to searchValue, sortValue variables, NOT the store state directly for parameters. 
-                // So we should just update the store state AND trigger reload.
                 return { ...s, selectedTag: tag, page: 1 };
             });
-            // We need to actually trigger the fetch. 
-            // Since +page.svelte controls the load via reactive vars, maybe we should just expose a method to update state?
-            // Or better: The store should be the source of truth.
+            // Note: The calling component usually triggers reload via reactive statement
         },
         addTag: async (filename, tag) => {
             try {

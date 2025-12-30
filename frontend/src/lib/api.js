@@ -1,13 +1,73 @@
 const API_URL = 'http://192.168.0.2:5000/api/videos';
 
 export const api = {
-    async fetchVideos(search = '', sort = 'name', page = 1, limit = 12, tag = '') {
-        const res = await fetch(`${API_URL}?search=${search}&sort=${sort}&page=${page}&limit=${limit}&tag=${tag}`);
+    async fetchVideos(search = '', sort = 'name', page = 1, limit = 12, tag = '', days = '', dateFrom = '', dateTo = '') {
+        let query = `${API_URL}?search=${search}&sort=${sort}&page=${page}&limit=${limit}&tag=${tag}`;
+        if (days) query += `&days=${days}`;
+        if (dateFrom) query += `&dateFrom=${dateFrom}`;
+        if (dateTo) query += `&dateTo=${dateTo}`;
+
+        const res = await fetch(query);
         return await res.json();
     },
     async fetchTags() {
         const res = await fetch(`${API_URL}/tags`);
         return await res.json();
+    },
+    async fetchStats() {
+        const res = await fetch(`${API_URL}/stats`);
+        return await res.json();
+    },
+    async fetchBlacklist() {
+        const res = await fetch(`${API_URL.replace('/api/videos', '')}/api/settings/blacklist`);
+        return await res.json();
+    },
+    async addBlacklistWord(word) {
+        const res = await fetch(`${API_URL.replace('/api/videos', '')}/api/settings/blacklist`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ word })
+        });
+        return await res.json();
+    },
+    async removeBlacklistWord(word) {
+        const res = await fetch(`${API_URL.replace('/api/videos', '')}/api/settings/blacklist/${word}`, {
+            method: 'DELETE'
+        });
+        return await res.json();
+    },
+    async getModels() {
+        // API_URL is .../api/videos, we need .../api/ollama/models
+        // Base is http://192.168.0.2:5000
+        const baseUrl = API_URL.replace('/api/videos', '');
+        const res = await fetch(`${baseUrl}/api/ollama/models`);
+        return await res.json();
+    },
+    async uploadVideo(formData, onProgress) {
+        const baseUrl = API_URL.replace('/api/videos', '');
+        return new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', `${baseUrl}/api/upload`);
+
+            xhr.upload.onprogress = (event) => {
+                if (event.lengthComputable && onProgress) {
+                    const percentComplete = (event.loaded / event.total) * 100;
+                    onProgress(percentComplete);
+                }
+            };
+
+            xhr.onload = () => {
+                if (xhr.status === 200) {
+                    resolve(JSON.parse(xhr.response));
+                } else {
+                    reject(new Error('Upload failed'));
+                }
+            };
+
+            xhr.onerror = () => reject(new Error('Upload failed'));
+
+            xhr.send(formData);
+        });
     },
     async addTag(filename, tag) {
         const res = await fetch(`${API_URL}/${filename}/tags`, {

@@ -1,6 +1,7 @@
 <script lang="ts">
-	import favicon from '$lib/assets/favicon.svg';
-	import '../app.css';
+	import favicon from "$lib/assets/favicon.svg";
+	import "../app.css";
+	import ConsoleLog from "../components/ConsoleLog.svelte";
 
 	let { children } = $props();
 </script>
@@ -10,3 +11,5 @@
 </svelte:head>
 
 {@render children()}
+
+<ConsoleLog />
