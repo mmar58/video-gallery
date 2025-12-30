@@ -1,34 +1,73 @@
 <script>
-    import { onMount } from "svelte";
+    import { onMount, tick } from "svelte";
     import { api } from "$lib/api";
     import VideoCard from "../../components/VideoCard.svelte";
+    import TimelineVideoCard from "../../components/TimelineVideoCard.svelte";
     import VideoPlayer from "../../components/VideoPlayer.svelte";
 
     let videos = [];
-    let loading = true;
     let groupedVideos = {}; // { 'YYYY-MM-DD': [videos] }
+    let page = 1;
+    let limit = 50; // Smaller chunks
+    let loading = false;
+    let hasMore = true;
+    let observer;
+    let sentinel; // Bind to this element for scroll detection
 
     onMount(async () => {
-        try {
-            // Load all videos sorted by date
-            const res = await api.fetchVideos("", "date", 1, 1000); // High limit to get most/all for timeline
-            videos = res.videos;
+        loadMore();
 
-            // Group by date
-            groupedVideos = videos.reduce((groups, video) => {
-                const date = new Date(video.created).toLocaleDateString();
-                if (!groups[date]) {
-                    groups[date] = [];
+        // Intersection Observer for Infinite Scroll
+        observer = new IntersectionObserver(
+            (entries) => {
+                if (entries[0].isIntersecting && !loading && hasMore) {
+                    loadMore();
                 }
-                groups[date].push(video);
-                return groups;
-            }, {});
+            },
+            { rootMargin: "400px" },
+        );
+    });
+
+    $: if (sentinel && observer) {
+        observer.observe(sentinel);
+    }
+
+    async function loadMore() {
+        if (loading || !hasMore) return;
+        loading = true;
+
+        try {
+            const res = await api.fetchVideos("", "date", page, limit);
+            const newVideos = res.videos;
+
+            if (newVideos.length < limit) {
+                hasMore = false;
+            }
+
+            videos = [...videos, ...newVideos];
+            groupVideos();
+            page++;
         } catch (e) {
             console.error(e);
         } finally {
             loading = false;
         }
-    });
+    }
+
+    function groupVideos() {
+        // Group by date, but keep accumulating
+        // Re-reduce the whole list is simplest but might be heavy.
+        // Better to just iterate newVideos?
+        // For now, re-reducing full list ensures sorting correctness if dates interleave (unlikely with sorted fetch).
+        groupedVideos = videos.reduce((groups, video) => {
+            const date = new Date(video.created).toLocaleDateString();
+            if (!groups[date]) {
+                groups[date] = [];
+            }
+            groups[date].push(video);
+            return groups; // This relies on api returning sorted by date DESC
+        }, {});
+    }
 
     /* Player Logic Reuse */
     let activeVideos = [];
@@ -41,10 +80,12 @@
     function handleClosePlayer(event) {
         activeVideos = activeVideos.filter((v) => v.id !== event.detail);
     }
-    function handleFocusPlayer(event) {
-        activeVideos = activeVideos.map((v) =>
-            v.id === event.detail ? { ...v, zIndex: ++topZIndex } : v,
-        );
+    function handleRefresh() {
+        // Optional: refresh specific video in list
+        videos = [...videos]; // trigger reactivity
+    }
+    function handleDetails(event) {
+        // Implement details modal if needed
     }
 </script>
 
@@ -61,46 +102,53 @@
             >
         </header>
 
-        {#if loading}
-            <div class="text-center py-20 text-gray-500">
-                Loading timeline...
-            </div>
-        {:else}
-            <div
-                class="space-y-12 relative border-l-2 border-gray-700 ml-4 pl-8 pb-8"
-            >
-                {#each Object.entries(groupedVideos) as [date, daysVideos]}
-                    <div class="relative">
-                        <!-- Timeline Dot -->
-                        <div
-                            class="absolute -left-[41px] top-0 w-5 h-5 rounded-full bg-red-500 border-4 border-gray-900"
-                        ></div>
+        <div
+            class="space-y-12 relative border-l-2 border-gray-700 ml-4 pl-8 pb-8"
+        >
+            {#each Object.entries(groupedVideos) as [date, daysVideos]}
+                <div class="relative">
+                    <!-- Timeline Dot -->
+                    <div
+                        class="absolute -left-[41px] top-0 w-5 h-5 rounded-full bg-red-500 border-4 border-gray-900"
+                    ></div>
 
-                        <h2 class="text-xl font-semibold mb-4 text-gray-300">
-                            {date}
-                            <span class="text-sm font-normal text-gray-500"
-                                >({daysVideos.length} videos)</span
-                            >
-                        </h2>
-
-                        <div
-                            class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6"
+                    <h2 class="text-xl font-semibold mb-4 text-gray-300">
+                        {date}
+                        <span class="text-sm font-normal text-gray-500"
+                            >({daysVideos.length} videos)</span
                         >
-                            {#each daysVideos as video}
-                                <VideoCard {video} on:play={handlePlay} />
-                            {/each}
-                        </div>
+                    </h2>
+
+                    <div
+                        class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6"
+                    >
+                        {#each daysVideos as video (video.name)}
+                            <VideoCard
+                                {video}
+                                hoverMode="preview"
+                                on:play={handlePlay}
+                                on:refresh={handleRefresh}
+                            />
+                        {/each}
                     </div>
-                {/each}
-            </div>
-        {/if}
+                </div>
+            {/each}
+        </div>
+
+        <!-- Sentinel for Intersection Observer -->
+        <div bind:this={sentinel} class="h-20 flex items-center justify-center">
+            {#if loading}
+                <span class="text-gray-500 animate-pulse">Loading more...</span>
+            {:else if !hasMore}
+                <span class="text-gray-600">End of timeline</span>
+            {/if}
+        </div>
 
         {#each activeVideos as video (video.id)}
             <VideoPlayer
                 {video}
                 zIndex={video.zIndex}
                 on:close={() => handleClosePlayer({ detail: video.id })}
-                on:focus={() => handleFocusPlayer({ detail: video.id })}
             />
         {/each}
     </div>

@@ -136,7 +136,7 @@ export const api = {
         return await res.json();
     },
 
-    async getThumbnailUrl(filename) {
+    getThumbnailUrl(filename) {
         return `${API_URL.replace('/api/videos', '')}/api/thumbnails/${encodeURIComponent(filename)}`;
     },
 

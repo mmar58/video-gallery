@@ -17,35 +17,50 @@
     } from "lucide-svelte";
 
     export let video;
+    export let hoverMode = "player"; // 'player' | 'preview'
 
     const dispatch = createEventDispatcher();
     let videoRef;
     let isHovering = false;
+    let isPlaying = false;
     let playTimeout;
-    let thumbnailError = false; // Fallback to video if no thumb
+    let thumbnailError = false;
+    let hasInteracted = false; // To lazy load video
 
     // Tag Menu State
-    let activeTagMenu = null; // tagName
+    let activeTagMenu = null;
+
+    let pauseTimeout;
 
     function handleMouseEnter() {
         isHovering = true;
-        playTimeout = setTimeout(() => {
-            // Only play if we are showing the video element
-            if (videoRef && videoRef.paused) {
-                videoRef.play().catch(() => {});
-            }
-        }, 300); // 300ms delay for smoother hover intent
+        if (pauseTimeout) clearTimeout(pauseTimeout);
+
+        if (hoverMode === "player") {
+            hasInteracted = true;
+            playTimeout = setTimeout(() => {
+                if (videoRef && videoRef.paused) {
+                    videoRef.play().catch(() => {});
+                }
+            }, 200);
+        } else if (hoverMode === "preview") {
+            checkPreview();
+        }
     }
 
     function handleMouseLeave() {
         isHovering = false;
-        activeTagMenu = null; // Close menu on leave
+        activeTagMenu = null;
         clearTimeout(playTimeout);
+
         if (videoRef && !videoRef.paused) {
-            videoRef.pause();
+            pauseTimeout = setTimeout(() => {
+                if (videoRef) videoRef.pause();
+            }, 8000);
         }
     }
 
+    // ... (Keep existing handlers: handleLike, handleDelete, etc.) ...
     function handleLike(e) {
         e.stopPropagation();
         videoStore.toggleLike(video.name);
@@ -120,7 +135,6 @@
         e.stopPropagation();
         try {
             await api.generateThumbnail(video.name);
-            // Force reload image logic
             thumbnailError = false;
             const img = document.querySelector(`img[data-vid="${video.name}"]`);
             if (img)
@@ -131,47 +145,37 @@
     }
 
     /* Animated Preview Logic */
-    let showPreview = false;
     let previewLoaded = false;
     let previewBgPosition = "0% 0%";
 
     function handleMouseMove(e) {
-        if (!processPreview || !previewLoaded) return;
+        // Only run logic if in preview mode OR if we just want the visual but hoverMode dictates interaction
+        if (hoverMode !== "preview" || !previewLoaded) return;
 
         const rect = e.currentTarget.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const width = rect.width;
 
-        // Calculate frame index (0 to 24)
         const totalFrames = 25;
         const cols = 5;
         const rows = 5;
 
         const percent = Math.max(0, Math.min(1, x / width));
         const frameIndex = Math.floor(percent * totalFrames);
-
-        // Calculate grid position
         const col = frameIndex % cols;
         const row = Math.floor(frameIndex / cols);
-
-        // Convert to percentage for background-position
-        // For N items, we use (i / (N-1)) * 100%
         const xPos = (col / (cols - 1)) * 100;
         const yPos = (row / (rows - 1)) * 100;
 
         previewBgPosition = `${xPos}% ${yPos}%`;
     }
 
-    // Try to load preview image on mount or hover?
-    // Let's do lazy load on first hover intent?
     let triedLoadingPreview = false;
-
-    $: processPreview = isHovering && previewLoaded;
+    $: processPreview = hoverMode === "preview" && isHovering && previewLoaded;
 
     function checkPreview() {
         if (triedLoadingPreview) return;
         triedLoadingPreview = true;
-
         const img = new Image();
         img.src = api.getPreviewUrl(video.name);
         img.onload = () => {
@@ -183,7 +187,7 @@
         e.stopPropagation();
         try {
             await api.generatePreview(video.name);
-            triedLoadingPreview = false; // Reset to force reload
+            triedLoadingPreview = false;
             checkPreview();
             alert("Preview generated! Hover to see effect.");
         } catch (err) {
@@ -195,18 +199,15 @@
 <!-- svelte-ignore a11y-click-events-have-key-events -->
 <div
     class="relative group bg-gray-900 rounded-lg overflow-hidden shadow-lg cursor-pointer transition-transform hover:scale-105"
-    on:mouseenter={(e) => {
-        handleMouseEnter();
-        checkPreview();
-    }}
+    on:mouseenter={handleMouseEnter}
     on:mouseleave={handleMouseLeave}
     on:mousemove={handleMouseMove}
     on:click={() => dispatch("play", video)}
 >
     <!-- Video Preview / Thumbnail -->
     <div class="aspect-video bg-black relative overflow-hidden">
+        <!-- Mode: Preview (Sprite Sheet) -->
         {#if processPreview}
-            <!-- Sprite Sheet Preview -->
             <div
                 class="absolute inset-0 w-full h-full bg-no-repeat"
                 style="
@@ -216,18 +217,34 @@
                 "
             ></div>
 
-            <!-- Time indicator (optional) -->
-            <!-- <div class="absolute bottom-1 right-1 bg-black/50 text-white text-[10px] px-1 rounded">Preview</div> -->
-        {:else if isHovering || thumbnailError}
-            <video
-                bind:this={videoRef}
-                src={api.getStreamUrl(video.name)}
-                class="w-full h-full object-cover"
-                muted
-                loop
-                playsinline
-                preload="metadata"
-            ></video>
+            <!-- Mode: Player (Video Element) -->
+        {:else if hoverMode === "player"}
+            <!-- Always show thumbnail as background/placeholder -->
+            <img
+                data-vid={video.name}
+                src={api.getThumbnailUrl(video.name)}
+                alt={video.name}
+                class="w-full h-full object-cover absolute inset-0 transition-opacity duration-300 {hasInteracted &&
+                !thumbnailError
+                    ? 'opacity-0'
+                    : 'opacity-100'}"
+                on:error={() => (thumbnailError = true)}
+            />
+
+            <!-- Video Element: Lazy Inducted on Interaction -->
+            {#if hasInteracted || thumbnailError}
+                <video
+                    bind:this={videoRef}
+                    src={api.getStreamUrl(video.name)}
+                    class="w-full h-full object-cover transition-opacity duration-300 opacity-100"
+                    muted
+                    loop
+                    playsinline
+                    preload="metadata"
+                ></video>
+            {/if}
+
+            <!-- Fallback/Default Static -->
         {:else}
             <img
                 data-vid={video.name}
