@@ -29,17 +29,37 @@ function createVideoStore() {
             }
         },
         setPage: (page) => {
-            update(s => {
-                // Return same state if page is out of bounds or same
-                if (page < 1 || page > s.maxPage || page === s.page) return s;
-                // Trigger load with new page
-                // Note: We need to access current search/sort
-                // This is a bit tricky with just 'update'. 
-                // A better way is to delegate to load()
-                return s;
-            });
-            // We need to trigger load explicitly. 
-            // Ideally we subscribe or use a derived store, but let's keep it simple.
+            // Get current state
+            let currentState;
+            subscribe(s => currentState = s)();
+
+            // Validate
+            if (page < 1 || page > currentState.maxPage || page === currentState.page) return;
+
+            // Trigger load logic (which updates store)
+            // We reuse the load function logic here to avoid duplication or circular dependency
+            const { search, sort } = currentState;
+
+            // Call the load method defined above (we need to capture it or just invoke update logic directly)
+            // Since `load` is part of the return object, we can't call it easily from here without defining it outside.
+            // Let's just re-implement the fetch call for now or refactor. 
+            // Better: define `loadVideos` helper inside createVideoStore.
+
+            // ... actually, the cleanest quick fix without big refactor:
+            update(s => ({ ...s, loading: true, page }));
+
+            api.fetchVideos(search, sort, page)
+                .then(data => {
+                    update(s => ({
+                        ...s,
+                        videos: data.videos,
+                        maxPage: data.pagination.totalPages,
+                        loading: false
+                    }));
+                })
+                .catch(err => {
+                    update(s => ({ ...s, error: err.message, loading: false }));
+                });
         },
         toggleLike: async (filename) => {
             try {

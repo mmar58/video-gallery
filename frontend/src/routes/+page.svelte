@@ -4,7 +4,6 @@
     import VideoCard from "../components/VideoCard.svelte";
     import VideoPlayer from "../components/VideoPlayer.svelte";
 
-    let selectedVideo = null;
     let searchValue = "";
     let sortValue = "name";
 
@@ -12,12 +11,26 @@
         videoStore.load(searchValue, sortValue);
     }
 
+    /* Player Management */
+    let activeVideos = [];
+    let topZIndex = 100;
+
     function handlePlay(event) {
-        selectedVideo = event.detail;
+        const video = event.detail;
+        const id = Date.now() + Math.random(); // Ensure unique ID
+        activeVideos = [...activeVideos, { ...video, id, zIndex: ++topZIndex }];
     }
 
-    function handleClose() {
-        selectedVideo = null;
+    function handleClosePlayer(event) {
+        const id = event.detail;
+        activeVideos = activeVideos.filter((v) => v.id !== id);
+    }
+
+    function handleFocusPlayer(event) {
+        const id = event.detail;
+        activeVideos = activeVideos.map((v) =>
+            v.id === id ? { ...v, zIndex: ++topZIndex } : v,
+        );
     }
 
     function handleRefresh() {
@@ -57,7 +70,7 @@
     </header>
 
     <!-- Video Grid -->
-    <main class="max-w-7xl mx-auto">
+    <main class="max-w-7xl mx-auto pb-20">
         {#if $videoStore.loading}
             <div class="text-center py-20 text-gray-500">Loading...</div>
         {:else if $videoStore.error}
@@ -112,8 +125,13 @@
         {/if}
     </main>
 
-    <!-- Player Modal -->
-    {#if selectedVideo}
-        <VideoPlayer video={selectedVideo} on:close={handleClose} />
-    {/if}
+    <!-- Active Video Players -->
+    {#each activeVideos as video (video.id)}
+        <VideoPlayer
+            {video}
+            zIndex={video.zIndex}
+            on:close={() => handleClosePlayer({ detail: video.id })}
+            on:focus={() => handleFocusPlayer({ detail: video.id })}
+        />
+    {/each}
 </div>

@@ -25,7 +25,7 @@
         clearTimeout(playTimeout);
         if (videoRef && !videoRef.paused) {
             videoRef.pause();
-            videoRef.currentTime = 0; // Reset preview
+            // Removed currentTime reset to allow resume
         }
     }
 

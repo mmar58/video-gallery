@@ -1,51 +1,99 @@
 <script>
-  import { createEventDispatcher, onMount } from 'svelte';
-  import { api } from '../lib/api';
+  import { createEventDispatcher } from "svelte";
+  import { api } from "../lib/api";
 
-  export let video; // Filename
+  export let video;
+  export let zIndex = 100;
 
   const dispatch = createEventDispatcher();
   let videoEl;
+  let containerEl;
 
-  function close() {
-    dispatch('close');
-  }
+  let isDragging = false;
+  let startX, startY, startLeft, startTop;
 
-  function toggleFullscreen() {
-    if (!document.fullscreenElement) {
-      videoEl.requestFullscreen().catch(err => console.error(err));
+  // Initial position (center-ish)
+  let left = 100 + Math.random() * 50;
+  let top = 100 + Math.random() * 50;
+
+  function handleMouseDown(e) {
+    // Only trigger drag if clicking header/title area
+    if (e.target.closest(".drag-handle")) {
+      isDragging = true;
+      startX = e.clientX;
+      startY = e.clientY;
+      startLeft = left;
+      startTop = top;
+
+      window.addEventListener("mousemove", handleMouseMove);
+      window.addEventListener("mouseup", handleMouseUp);
+      dispatch("focus"); // Bring to front
     } else {
-      document.exitFullscreen();
+      dispatch("focus");
     }
   }
 
-  // Close on Escape key
-  function handleKeydown(e) {
-    if (e.key === 'Escape') close();
+  function handleMouseMove(e) {
+    if (!isDragging) return;
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+    left = startLeft + dx;
+    top = startTop + dy;
+  }
+
+  function handleMouseUp() {
+    isDragging = false;
+    window.removeEventListener("mousemove", handleMouseMove);
+    window.removeEventListener("mouseup", handleMouseUp);
+  }
+
+  function close() {
+    dispatch("close");
   }
 </script>
 
-<svelte:window on:keydown={handleKeydown} />
-
-<div class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-90 backdrop-blur-sm" on:click={close}>
-  <!-- Stop propagation to prevent closing when clicking the player controls -->
-  <div class="relative w-full max-w-6xl p-4" on:click|stopPropagation>
-     <!-- Close Button -->
-    <button 
-      class="absolute -top-10 right-4 text-white hover:text-red-500 text-2xl font-bold" 
-      on:click={close}
+<div
+  bind:this={containerEl}
+  class="fixed shadow-2xl rounded-lg bg-gray-900 border border-gray-700 flex flex-col overflow-hidden resize-both"
+  style="left: {left}px; top: {top}px; width: 640px; z-index: {zIndex}; resize: both; overflow: auto; min-width: 320px;"
+  on:mousedown={handleMouseDown}
+>
+  <!-- Header / Drag Handle -->
+  <div
+    class="drag-handle bg-gray-800 p-2 cursor-move flex justify-between items-center select-none"
+  >
+    <h3 class="text-white text-sm font-medium truncate px-2 max-w-[80%]">
+      {video.name}
+    </h3>
+    <button
+      on:click|stopPropagation={close}
+      class="text-gray-400 hover:text-white px-2 text-lg leading-none"
     >
-      &times; Close
+      &times;
     </button>
+  </div>
 
-    <video 
+  <!-- Content -->
+  <div
+    class="relative bg-black flex-1 flex items-center justify-center min-h-0"
+  >
+    <video
       bind:this={videoEl}
-      src={api.getStreamUrl(video.name)} 
-      class="w-full h-auto rounded-lg shadow-2xl" 
-      controls 
+      src={api.getStreamUrl(video.name)}
+      class="w-full h-full object-contain"
+      controls
       autoplay
     ></video>
-    
-    <h2 class="text-white text-xl mt-4 text-center">{video.name}</h2>
   </div>
 </div>
+
+<style>
+  /* Hide scrollbars for the resize container */
+  .resize-both::-webkit-scrollbar {
+    display: none;
+  }
+  .resize-both {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+</style>
