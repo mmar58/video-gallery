@@ -25,6 +25,7 @@
     let dateFrom = "";
     let dateTo = "";
     let isMounted = false;
+    let jumpToPage = 1;
 
     // Initialize from URL
     onMount(async () => {
@@ -33,6 +34,7 @@
         sortValue = query.get("sort") || "name";
         tagValue = query.get("tag") || "";
         const p = parseInt(query.get("page") || "1");
+        jumpToPage = p;
 
         // Initial load
         await videoStore.load(searchValue, sortValue, p, tagValue);
@@ -64,8 +66,10 @@
 
         if (s.search) query.set("search", s.search);
         if (s.sort !== "name") query.set("sort", s.sort);
+        if (s.sort !== "name") query.set("sort", s.sort);
         if (s.selectedTag) query.set("tag", s.selectedTag);
         if (s.page > 1) query.set("page", s.page.toString());
+        jumpToPage = s.page;
 
         const queryString = query.toString();
         const url = queryString ? `?${queryString}` : "/";
@@ -109,6 +113,17 @@
     function handleRefresh() {
         // Reload current state
         videoStore.load(searchValue, sortValue, $videoStore.page, tagValue);
+    }
+
+    function handlePageInput(e) {
+        if (e.key === "Enter" || e.type === "blur") {
+            const p = parseInt(jumpToPage);
+            if (!isNaN(p) && p >= 1 && p <= $videoStore.maxPage) {
+                videoStore.setPage(p);
+            } else {
+                jumpToPage = $videoStore.page; // Reset on invalid
+            }
+        }
     }
 </script>
 
@@ -360,6 +375,24 @@
                         >{$videoStore.maxPage}</span
                     >
                 </span>
+
+                <div class="flex items-center gap-2">
+                    <input
+                        type="number"
+                        min="1"
+                        max={$videoStore.maxPage}
+                        bind:value={jumpToPage}
+                        on:keydown={handlePageInput}
+                        on:blur={handlePageInput}
+                        class="w-16 bg-gray-800 border border-gray-700 rounded px-2 py-1 text-center text-white focus:outline-none focus:border-red-500"
+                    />
+                    <button
+                        class="px-3 py-1 bg-gray-800 text-white rounded hover:bg-gray-700 transition text-sm"
+                        on:click={() => handlePageInput({ key: "Enter" })}
+                    >
+                        Go
+                    </button>
+                </div>
 
                 <button
                     class="px-4 py-2 bg-gray-800 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-700 transition"

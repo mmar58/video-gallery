@@ -1,6 +1,7 @@
 <script lang="ts">
 	// src/routes/+layout.js
 	export const prerender = true;
+	export const trailingSlash = "always";
 	import favicon from "$lib/assets/favicon.svg";
 	import "../app.css";
 	import ConsoleLog from "../components/ConsoleLog.svelte";
