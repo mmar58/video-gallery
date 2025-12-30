@@ -124,11 +124,10 @@ module.exports = (io) => {
                 socket.abortController = null;
             }
         });
-    });
 
-    socket.on('disconnect', () => {
-        socket.isTagging = false;
-        console.log('Client disconnected:', socket.id);
+        socket.on('disconnect', () => {
+            socket.isTagging = false;
+            console.log('Client disconnected:', socket.id);
+        });
     });
-});
 };
