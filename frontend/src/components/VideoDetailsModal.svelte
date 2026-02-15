@@ -16,6 +16,7 @@
         Edit2,
         Plus,
         Ban,
+        Scissors,
     } from "lucide-svelte";
 
     export let isOpen = false;
@@ -308,6 +309,12 @@
 
                 <!-- Actions Bar -->
                 <div class="flex flex-wrap gap-2 mb-8">
+                    <button
+                        on:click={() => dispatch("trim", video)}
+                        class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded text-sm flex items-center gap-2 transition"
+                    >
+                        <Scissors size={14} /> Trim
+                    </button>
                     <button
                         on:click={handleRename}
                         class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded text-sm flex items-center gap-2 transition"

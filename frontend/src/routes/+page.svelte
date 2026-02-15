@@ -10,11 +10,13 @@
     import AutoThumbnailModal from "../components/AutoThumbnailModal.svelte";
     import BlacklistModal from "../components/BlacklistModal.svelte";
     import VideoDetailsModal from "../components/VideoDetailsModal.svelte";
+    import VideoTrimModal from "../components/VideoTrimModal.svelte";
 
     let isAutoTagOpen = false;
     let isAutoThumbnailOpen = false;
     let isBlacklistOpen = false;
     let isDetailsOpen = false;
+    let isTrimOpen = false;
     let selectedVideo = null;
 
     // Malformed code removed
@@ -96,6 +98,12 @@
     function handleDetails(event) {
         selectedVideo = event.detail;
         isDetailsOpen = true;
+    }
+
+    function handleTrim(event) {
+        selectedVideo = event.detail;
+        isTrimOpen = true;
+        isDetailsOpen = false; // Close details if open
     }
 
     function handleClosePlayer(event) {
@@ -328,7 +336,16 @@
     <AutoTagModal bind:isOpen={isAutoTagOpen} />
     <AutoThumbnailModal bind:isOpen={isAutoThumbnailOpen} />
     <BlacklistModal bind:isOpen={isBlacklistOpen} />
-    <VideoDetailsModal bind:isOpen={isDetailsOpen} video={selectedVideo} />
+    <VideoDetailsModal
+        bind:isOpen={isDetailsOpen}
+        video={selectedVideo}
+        on:trim={(e) => handleTrim({ detail: e.detail })}
+    />
+    <VideoTrimModal
+        bind:isOpen={isTrimOpen}
+        video={selectedVideo}
+        on:refresh={handleRefresh}
+    />
 
     <!-- Video Grid -->
     <main class="max-w-7xl mx-auto pb-20">
@@ -348,8 +365,10 @@
                     <VideoCard
                         {video}
                         on:play={handlePlay}
+                        on:play={handlePlay}
                         on:refresh={handleRefresh}
                         on:details={handleDetails}
+                        on:trim={handleTrim}
                     />
                 {/each}
             </div>

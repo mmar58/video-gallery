@@ -6,6 +6,7 @@
     import TimelineVideoCard from "../../components/TimelineVideoCard.svelte";
     import VideoPlayer from "../../components/VideoPlayer.svelte";
     import VideoDetailsModal from "../../components/VideoDetailsModal.svelte";
+    import VideoTrimModal from "../../components/VideoTrimModal.svelte";
 
     let videos = [];
     let groupedVideos = {}; // { 'YYYY-MM-DD': [videos] }
@@ -19,6 +20,7 @@
     // Details Modal State
     let selectedVideo = null;
     let isDetailsOpen = false;
+    let isTrimOpen = false;
 
     onMount(async () => {
         loadMore();
@@ -94,6 +96,12 @@
         selectedVideo = event.detail;
         isDetailsOpen = true;
     }
+
+    function handleTrim(event) {
+        selectedVideo = event.detail;
+        isTrimOpen = true;
+        isDetailsOpen = false;
+    }
 </script>
 
 <div class="min-h-screen bg-gray-900 text-gray-100 p-6">
@@ -134,7 +142,10 @@
                                 {video}
                                 on:play={handlePlay}
                                 on:refresh={handleRefresh}
+                                on:play={handlePlay}
+                                on:refresh={handleRefresh}
                                 on:details={handleDetails}
+                                on:trim={handleTrim}
                             />
                         {/each}
                     </div>
@@ -161,6 +172,12 @@
 
         <VideoDetailsModal
             bind:isOpen={isDetailsOpen}
+            video={selectedVideo}
+            on:refresh={handleRefresh}
+            on:trim={(e) => handleTrim({ detail: e.detail })}
+        />
+        <VideoTrimModal
+            bind:isOpen={isTrimOpen}
             video={selectedVideo}
             on:refresh={handleRefresh}
         />

@@ -1,11 +1,10 @@
-<script>
+<script lang="ts">
     import { createEventDispatcher } from "svelte";
     import { goto } from "$app/navigation";
     import { base } from "$app/paths";
     import { videoStore } from "../stores/videoStore";
     import { api } from "../lib/api";
     import {
-        MoreVertical,
         Play,
         Heart,
         Plus,
@@ -15,25 +14,26 @@
         Filter,
         Image as ImageIcon,
         Info,
+        Scissors,
     } from "lucide-svelte";
     import { toast } from "../stores/toastStore";
     import { logStore } from "../stores/logStore";
 
-    export let video;
+    export let video: any; // Ideally define a proper Video interface
     export let hoverMode = "player"; // 'player' | 'preview'
 
     const dispatch = createEventDispatcher();
-    let videoRef;
+    let videoRef: HTMLVideoElement;
     let isHovering = false;
     let isPlaying = false;
-    let playTimeout;
+    let playTimeout: any;
     let thumbnailError = false;
     let hasInteracted = false; // To lazy load video
 
     // Tag Menu State
-    let activeTagMenu = null;
+    let activeTagMenu: string | null = null;
 
-    let pauseTimeout;
+    let pauseTimeout: any;
 
     function handleMouseEnter() {
         isHovering = true;
@@ -63,20 +63,19 @@
         }
     }
 
-    // ... (Keep existing handlers: handleLike, handleDelete, etc.) ...
-    function handleLike(e) {
+    function handleLike(e: Event) {
         e.stopPropagation();
         videoStore.toggleLike(video.name);
     }
 
-    function handleDelete(e) {
+    function handleDelete(e: Event) {
         e.stopPropagation();
         if (confirm(`Delete ${video.name}?`)) {
             videoStore.remove(video.name);
         }
     }
 
-    function handleRename(e) {
+    function handleRename(e: Event) {
         e.stopPropagation();
         const newName = prompt("Rename video:", video.name);
         if (newName && newName !== video.name) {
@@ -84,7 +83,7 @@
         }
     }
 
-    function handleAddTag(e) {
+    function handleAddTag(e: Event) {
         e.stopPropagation();
         const tag = prompt("Enter new tag:");
         if (tag) {
@@ -93,23 +92,23 @@
     }
 
     // Tag Actions
-    function handleTagClick(e, tag) {
+    function handleTagClick(e: Event, tag: string) {
         e.stopPropagation();
         activeTagMenu = activeTagMenu === tag ? null : tag;
     }
 
-    function filterByTag(tag) {
+    function filterByTag(tag: string) {
         goto(`${base}/tags/${encodeURIComponent(tag)}`);
     }
 
-    async function removeTagFromVideo(tag) {
+    async function removeTagFromVideo(tag: string) {
         if (confirm(`Remove tag "${tag}" from this video?`)) {
             await videoStore.removeTag(video.name, tag);
             activeTagMenu = null;
         }
     }
 
-    async function handleRenameTag(tag) {
+    async function handleRenameTag(tag: string) {
         const newName = prompt("Rename tag globally:", tag);
         if (newName && newName !== tag) {
             try {
@@ -122,7 +121,7 @@
         }
     }
 
-    async function handleBlacklistTag(tag) {
+    async function handleBlacklistTag(tag: string) {
         if (confirm(`Blacklist "${tag}"? (Removes from all videos + Bans)`)) {
             try {
                 await api.blacklistTag(tag);
@@ -134,7 +133,7 @@
         }
     }
 
-    async function generateThumbnail(e) {
+    async function generateThumbnail(e: Event) {
         e.stopPropagation();
         try {
             toast.info(`Generating thumbnail for ${video.name}...`);
@@ -143,13 +142,15 @@
             thumbnailError = false;
 
             // Force refresh image
-            const img = document.querySelector(`img[data-vid="${video.name}"]`);
+            const img = document.querySelector(
+                `img[data-vid="${video.name}"]`,
+            ) as HTMLImageElement;
             if (img)
                 img.src = api.getThumbnailUrl(video.name) + "?t=" + Date.now();
 
             toast.success("Thumbnail generated!");
             logStore.add(`Thumbnail generated for ${video.name}`, "success");
-        } catch (err) {
+        } catch (err: any) {
             toast.error("Failed to generate thumbnail");
             logStore.add(
                 `Error generating thumbnail for ${video.name}: ${err.message}`,
@@ -162,11 +163,12 @@
     let previewLoaded = false;
     let previewBgPosition = "0% 0%";
 
-    function handleMouseMove(e) {
+    function handleMouseMove(e: MouseEvent) {
         // Only run logic if in preview mode OR if we just want the visual but hoverMode dictates interaction
         if (hoverMode !== "preview" || !previewLoaded) return;
 
-        const rect = e.currentTarget.getBoundingClientRect();
+        const target = e.currentTarget as HTMLElement;
+        const rect = target.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const width = rect.width;
 
@@ -197,7 +199,7 @@
         };
     }
 
-    async function generatePreview(e) {
+    async function generatePreview(e: Event) {
         e.stopPropagation();
         try {
             toast.info(`Generating preview for ${video.name}...`);
@@ -208,7 +210,7 @@
 
             toast.success("Preview generated! Hover to see effect.");
             logStore.add(`Preview generated for ${video.name}`, "success");
-        } catch (err) {
+        } catch (err: any) {
             toast.error("Failed to generate preview");
             logStore.add(
                 `Error generating preview for ${video.name}: ${err.message}`,
@@ -221,6 +223,8 @@
 <!-- svelte-ignore a11y-click-events-have-key-events -->
 <div
     class="relative group bg-gray-900 rounded-lg overflow-hidden shadow-lg cursor-pointer transition-transform hover:scale-105"
+    role="button"
+    tabindex="0"
     on:mouseenter={handleMouseEnter}
     on:mouseleave={handleMouseLeave}
     on:mousemove={handleMouseMove}
@@ -327,6 +331,16 @@
                 <ImageIcon size={16} class="text-orange-300" />
             </button>
             <button
+                on:click={(e) => {
+                    e.stopPropagation();
+                    dispatch("trim", video);
+                }}
+                class="bg-black/60 p-2 rounded-full hover:bg-yellow-500/80 text-white backdrop-blur-sm transition"
+                title="Trim Video"
+            >
+                <Scissors size={16} />
+            </button>
+            <button
                 on:click={handleRename}
                 class="bg-black/60 p-2 rounded-full hover:bg-blue-500/80 text-white backdrop-blur-sm transition"
                 title="Rename Video"
@@ -388,6 +402,8 @@
                         {#if activeTagMenu === tag}
                             <div
                                 class="absolute bottom-full left-0 mb-2 w-48 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50 overflow-hidden flex flex-col text-sm animate-in fade-in slide-in-from-bottom-2 duration-100"
+                                role="button"
+                                tabindex="0"
                                 on:click|stopPropagation
                             >
                                 <button

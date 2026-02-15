@@ -314,4 +314,74 @@ router.delete('/:filename/tags/:tag', (req, res) => {
     res.json(meta);
 });
 
+// POST /api/videos/:filename/trim - Trim video
+router.post('/:filename/trim', (req, res) => {
+    const { start, end, saveAsNew, newName } = req.body;
+    const filename = req.params.filename;
+    const filePath = getPath(filename);
+
+    if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'File not found' });
+    if (start === undefined || end === undefined) return res.status(400).json({ error: 'Start and end times required' });
+
+    // Validate times (basic)
+    if (parseFloat(start) >= parseFloat(end)) {
+        return res.status(400).json({ error: 'Start time must be before end time' });
+    }
+
+    const ffmpeg = require('fluent-ffmpeg');
+    const ffmpegPath = require('ffmpeg-static');
+    ffmpeg.setFfmpegPath(ffmpegPath);
+
+    const outputName = saveAsNew && newName ? newName : (saveAsNew ? `trimmed-${Date.now()}-${filename}` : `temp-${filename}`);
+    // Ensure output extension matches input
+    const ext = path.extname(filename);
+    const finalOutputName = path.extname(outputName) === ext ? outputName : outputName + ext;
+    const outputPath = getPath(finalOutputName);
+
+    if (fs.existsSync(outputPath)) {
+        return res.status(409).json({ error: 'Output file already exists' });
+    }
+
+    ffmpeg(filePath)
+        .setStartTime(start)
+        .setDuration(parseFloat(end) - parseFloat(start))
+        .output(outputPath)
+        .on('end', () => {
+            if (saveAsNew) {
+                // Add to store
+                store.add(finalOutputName);
+                // Generate assets
+                require('../services/thumbnailService').generateThumbnail(finalOutputName);
+                require('../services/thumbnailService').generatePreview(finalOutputName);
+
+                res.json({ success: true, newFile: finalOutputName });
+            } else {
+                // Replace original
+                // 1. Delete original
+                fs.unlink(filePath, (err) => {
+                    if (err) {
+                        console.error("Failed to delete original after trim:", err);
+                        // Try to keep temp file at least?
+                        return res.status(500).json({ error: 'Failed to replace file' });
+                    }
+                    // 2. Rename temp to original
+                    fs.rename(outputPath, filePath, (err) => {
+                        if (err) return res.status(500).json({ error: 'Failed to rename temp file' });
+
+                        // Regenerate assets for the modified video
+                        require('../services/thumbnailService').generateThumbnail(filename);
+                        require('../services/thumbnailService').generatePreview(filename);
+
+                        res.json({ success: true });
+                    });
+                });
+            }
+        })
+        .on('error', (err) => {
+            console.error('Error trimming video:', err);
+            res.status(500).json({ error: 'Failed to trim video' });
+        })
+        .run();
+});
+
 module.exports = router;

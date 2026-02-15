@@ -171,5 +171,18 @@ export const api = {
     async getAssetDetails(filename) {
         const res = await fetch(`${API_URL.replace('/api/videos', '')}/api/thumbnails/${encodeURIComponent(filename)}/details`);
         return await res.json();
+    },
+
+    async trimVideo(filename, start, end, saveAsNew, newName) {
+        const res = await fetch(`${API_URL}/${filename}/trim`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ start, end, saveAsNew, newName })
+        });
+        if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.error || 'Trim failed');
+        }
+        return await res.json();
     }
 };

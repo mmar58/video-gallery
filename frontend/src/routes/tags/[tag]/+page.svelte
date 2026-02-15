@@ -8,10 +8,12 @@
     import VideoCard from "../../../components/VideoCard.svelte";
     import VideoPlayer from "../../../components/VideoPlayer.svelte";
     import VideoDetailsModal from "../../../components/VideoDetailsModal.svelte";
+    import VideoTrimModal from "../../../components/VideoTrimModal.svelte";
     import { ArrowLeft, Edit2, Trash2, Ban } from "lucide-svelte";
 
     let tag = "";
     let isDetailsOpen = false;
+    let isTrimOpen = false;
     let selectedVideo = null;
     let activeVideos = [];
     let topZIndex = 100;
@@ -39,6 +41,12 @@
     function handleDetails(event) {
         selectedVideo = event.detail;
         isDetailsOpen = true;
+    }
+
+    function handleTrim(event) {
+        selectedVideo = event.detail;
+        isTrimOpen = true;
+        isDetailsOpen = false;
     }
 
     function handleClosePlayer(event) {
@@ -171,14 +179,26 @@
                         {video}
                         on:play={handlePlay}
                         on:refresh={handleRefresh}
+                        on:play={handlePlay}
+                        on:refresh={handleRefresh}
                         on:details={handleDetails}
+                        on:trim={handleTrim}
                     />
                 {/each}
             </div>
         {/if}
     </main>
 
-    <VideoDetailsModal bind:isOpen={isDetailsOpen} video={selectedVideo} />
+    <VideoDetailsModal
+        bind:isOpen={isDetailsOpen}
+        video={selectedVideo}
+        on:trim={(e) => handleTrim({ detail: e.detail })}
+    />
+    <VideoTrimModal
+        bind:isOpen={isTrimOpen}
+        video={selectedVideo}
+        on:refresh={handleRefresh}
+    />
 
     <!-- Active Video Players -->
     {#each activeVideos as video (video.id)}
