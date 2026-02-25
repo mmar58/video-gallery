@@ -142,8 +142,6 @@
                                 {video}
                                 on:play={handlePlay}
                                 on:refresh={handleRefresh}
-                                on:play={handlePlay}
-                                on:refresh={handleRefresh}
                                 on:details={handleDetails}
                                 on:trim={handleTrim}
                             />

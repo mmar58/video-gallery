@@ -365,7 +365,6 @@
                     <VideoCard
                         {video}
                         on:play={handlePlay}
-                        on:play={handlePlay}
                         on:refresh={handleRefresh}
                         on:details={handleDetails}
                         on:trim={handleTrim}
