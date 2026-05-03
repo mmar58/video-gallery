@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { generateTagsFromText } = require('../services/ollamaService');
 const store = require('../data/store');
+const { getOllamaSettings } = require('../data/settingsStore');
 
 const config = require('../config');
 
@@ -45,8 +46,8 @@ module.exports = (io) => {
             socket.abortController = new AbortController();
             socket.emit('tagging-status', { isTagging: true });
 
-            const { model } = data;
-            const modelName = model || 'llama3';
+            const { model } = data || {};
+            const modelName = model || getOllamaSettings().tagModel || 'llama3';
 
             console.log(`Starting auto-tagging with model: ${modelName}`);
             socket.emit('tagging-log', { message: `Starting...`, type: 'info' });

@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 
 const config = require('../config');
+const { getOllamaSettings, updateOllamaSettings } = require('../data/settingsStore');
 
 const BLACKLIST_FILE = path.join(config.dataDir, 'blacklist.json');
 
@@ -26,6 +27,21 @@ const saveBlacklist = (list) => {
 // GET /api/settings/blacklist - Get all blacklisted words
 router.get('/blacklist', (req, res) => {
     res.json(getBlacklist());
+});
+
+router.get('/ollama', (req, res) => {
+    res.json(getOllamaSettings());
+});
+
+router.put('/ollama', (req, res) => {
+    const { tagModel } = req.body || {};
+
+    if (typeof tagModel !== 'string' || !tagModel.trim()) {
+        return res.status(400).json({ error: 'tagModel is required' });
+    }
+
+    const settings = updateOllamaSettings({ tagModel: tagModel.trim() });
+    res.json(settings);
 });
 
 // POST /api/settings/blacklist - Add a word

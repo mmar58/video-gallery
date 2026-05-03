@@ -88,10 +88,14 @@
     /* Player Management */
     let activeVideos = [];
     let topZIndex = 100;
+    let lastPlayedAt = 0;
 
     function handlePlay(event) {
+        const now = Date.now();
+        if (now - lastPlayedAt < 300) return; // debounce: ignore duplicate events within 300ms
+        lastPlayedAt = now;
         const video = event.detail;
-        const id = Date.now() + Math.random();
+        const id = now + Math.random();
         activeVideos = [...activeVideos, { ...video, id, zIndex: ++topZIndex }];
     }
 

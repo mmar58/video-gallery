@@ -26,12 +26,18 @@
       if (vw < 768) {
         width = Math.min(vw * 0.9, 640);
         left = (vw - width) / 2;
-        top = 60 + Math.random() * 20; // Slight offset
+        top = 60 + Math.random() * 20;
       } else {
         width = 640;
         left = 100 + Math.random() * 50;
         top = 100 + Math.random() * 50;
       }
+
+      // Clamp initial position so the player starts inside the viewport
+      left = Math.min(left, vw - width);
+      top = Math.min(top, vh - 120); // 120px minimum visible height
+      left = Math.max(0, left);
+      top = Math.max(0, top);
     }
   });
 
@@ -48,8 +54,13 @@
     if (!isDragging) return;
     const dx = clientX - startX;
     const dy = clientY - startY;
-    left = startLeft + dx;
-    top = startTop + dy;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const playerWidth = containerEl ? containerEl.offsetWidth : width;
+    const playerHeight = containerEl ? containerEl.offsetHeight : 200;
+    // Clamp so the player never goes fully off-screen
+    left = Math.min(Math.max(0, startLeft + dx), vw - playerWidth);
+    top = Math.min(Math.max(0, startTop + dy), vh - playerHeight);
   }
 
   function handleEnd() {
@@ -113,7 +124,7 @@
 <div
   bind:this={containerEl}
   class="fixed shadow-2xl rounded-lg bg-gray-900 border border-gray-700 flex flex-col overflow-hidden player-window"
-  style="left: {left}px; top: {top}px; width: {width}px; z-index: {zIndex};"
+  style="left: {left}px; top: {top}px; width: {width}px; z-index: {zIndex}; max-width: calc(100vw - {left}px); max-height: calc(100vh - {top}px);"
   on:mousedown={handleMouseDown}
   on:touchstart={handleTouchStart}
 >

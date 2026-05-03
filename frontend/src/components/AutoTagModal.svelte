@@ -12,19 +12,36 @@
     let loading = false;
     let taggingStarted = false;
 
-    onMount(async () => {
+    async function load() {
         try {
             loading = true;
-            // Add getModels to api first if not exists, but we added it.
-            const res = await api.getModels();
-            models = res || [];
-            if (models.length > 0) selectedModel = models[0].name;
+            const [savedSettings, availableModels] = await Promise.all([
+                api.fetchOllamaSettings(),
+                api.getModels(),
+            ]);
+
+            models = availableModels || [];
+
+            const availableNames = models.map((model) => model.name);
+            const savedModel = savedSettings?.tagModel || "";
+
+            if (availableNames.includes(savedModel)) {
+                selectedModel = savedModel;
+            } else if (models.length > 0) {
+                selectedModel = models[0].name;
+            } else {
+                selectedModel = "";
+            }
         } catch (e) {
             console.error(e);
         } finally {
             loading = false;
         }
-    });
+    }
+
+    onMount(load);
+
+    $: if (isOpen) load();
 
     function close() {
         isOpen = false;
@@ -75,8 +92,7 @@
                             {/each}
                         </select>
                         <p class="text-xs text-gray-500 mt-2">
-                            Make sure you have a vision-capable model (like
-                            llava) if you want best results.
+                            The saved default comes from Settings, but you can still override it here for this run.
                         </p>
                     {:else}
                         <div class="text-red-400">

@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { generateTagsFromText } = require('../src/services/ollamaService');
 const store = require('../src/data/store');
+const { getOllamaSettings } = require('../src/data/settingsStore');
 
 const VIDEO_DIR = path.join(__dirname, '../../assets/videos');
 const BLACKLIST_FILE = path.join(__dirname, '../src/data/blacklist.json');
@@ -10,7 +11,8 @@ const BLACKLIST_FILE = path.join(__dirname, '../src/data/blacklist.json');
 const args = process.argv.slice(2);
 const force = args.includes('--force');
 const modelArg = args.find(a => a.startsWith('--model='));
-const model = modelArg ? modelArg.split('=')[1] : 'llama3';
+const defaultModel = getOllamaSettings().tagModel || 'llama3';
+const model = modelArg ? modelArg.split('=')[1] : defaultModel;
 
 function getBlacklist() {
     if (!fs.existsSync(BLACKLIST_FILE)) return [];

@@ -232,7 +232,10 @@
         >
             <!-- Like Button -->
             <button
-                on:click={handleLike}
+                on:click={(e) => {
+                    e.stopPropagation();
+                    handleLike(e);
+                }}
                 class="bg-black/60 p-1.5 rounded-full hover:bg-red-500/80 text-white backdrop-blur-sm transition flex items-center"
                 title={video.likes > 0 ? `${video.likes} Likes` : "Like"}
             >
@@ -247,7 +250,10 @@
             </button>
             <!-- Thumbnail Gen -->
             <button
-                on:click={generateThumbnail}
+                on:click={(e) => {
+                    e.stopPropagation();
+                    generateThumbnail(e);
+                }}
                 class="bg-black/60 p-1.5 rounded-full hover:bg-purple-500/80 text-white backdrop-blur-sm transition"
                 title="Generate Thumbnail"
             >
@@ -255,7 +261,10 @@
             </button>
             <!-- Preview Gen -->
             <button
-                on:click={generatePreview}
+                on:click={(e) => {
+                    e.stopPropagation();
+                    generatePreview(e);
+                }}
                 class="bg-black/60 p-1.5 rounded-full hover:bg-orange-500/80 text-white backdrop-blur-sm transition"
                 title="Generate Animated Preview"
             >
