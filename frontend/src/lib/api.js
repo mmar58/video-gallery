@@ -24,13 +24,17 @@ export const api = {
 
     async fetchOllamaSettings() {
         const baseUrl = API_URL.replace('/api/videos', '');
+        console.log('[settings-debug] api: fetchOllamaSettings request', `${baseUrl}/api/settings/ollama`);
         const res = await fetch(`${baseUrl}/api/settings/ollama`);
         if (!res.ok) throw new Error('Failed to fetch Ollama settings');
-        return await res.json();
+        const data = await res.json();
+        console.log('[settings-debug] api: fetchOllamaSettings success', data);
+        return data;
     },
 
     async saveOllamaSettings(settings) {
         const baseUrl = API_URL.replace('/api/videos', '');
+        console.log('[settings-debug] api: saveOllamaSettings request', settings);
         const res = await fetch(`${baseUrl}/api/settings/ollama`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
@@ -40,7 +44,9 @@ export const api = {
             const error = await res.json().catch(() => ({}));
             throw new Error(error.error || 'Failed to save Ollama settings');
         }
-        return await res.json();
+        const data = await res.json();
+        console.log('[settings-debug] api: saveOllamaSettings success', data);
+        return data;
     },
 
     async blacklistWord(word) {
@@ -99,9 +105,12 @@ export const api = {
 
     async getModels() {
         const baseUrl = API_URL.replace('/api/videos', '');
+        console.log('[settings-debug] api: getModels request', `${baseUrl}/api/ollama/models`);
         const res = await fetch(`${baseUrl}/api/ollama/models`);
         if (!res.ok) throw new Error('Failed to fetch Ollama models');
-        return await res.json();
+        const data = await res.json();
+        console.log('[settings-debug] api: getModels success count', Array.isArray(data) ? data.length : 0);
+        return data;
     },
 
     async uploadVideo(formData, onProgress) {

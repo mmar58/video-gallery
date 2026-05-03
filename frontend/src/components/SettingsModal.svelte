@@ -14,6 +14,7 @@
     let error = "";
 
     async function load() {
+        console.log("[settings-debug] modal: load() start");
         loading = true;
         error = "";
 
@@ -31,22 +32,39 @@
             selectedTagModel = availableNames.includes(savedModel)
                 ? savedModel
                 : availableNames[0] || savedModel;
+            console.log("[settings-debug] modal: load() success", {
+                savedModel,
+                modelCount: models.length,
+                selectedTagModel,
+            });
         } catch (err) {
             error = err.message || "Failed to load settings";
+            console.error("[settings-debug] modal: load() failed", err);
         } finally {
             loading = false;
+            console.log("[settings-debug] modal: load() end");
         }
     }
 
-    onMount(load);
+    onMount(() => {
+        console.log("[settings-debug] modal: onMount");
+        load();
+    });
 
-    $: if (isOpen) load();
+    $: console.log("[settings-debug] modal: isOpen =", isOpen);
+
+    $: if (isOpen) {
+        console.log("[settings-debug] modal: open detected, triggering load()");
+        load();
+    }
 
     function close() {
+        console.log("[settings-debug] modal: close() called");
         onClose();
     }
 
     async function save() {
+        console.log("[settings-debug] modal: save() start", { selectedTagModel });
         if (!selectedTagModel) return;
 
         saving = true;
@@ -54,16 +72,20 @@
 
         try {
             await api.saveOllamaSettings({ tagModel: selectedTagModel });
+            console.log("[settings-debug] modal: save() success");
             close();
         } catch (err) {
             error = err.message || "Failed to save settings";
+            console.error("[settings-debug] modal: save() failed", err);
         } finally {
             saving = false;
+            console.log("[settings-debug] modal: save() end");
         }
     }
 </script>
 
 {#if isOpen}
+    {@const _debugRender = console.log("[settings-debug] modal: render block visible")}
     <div
         class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
         transition:fade

@@ -8,7 +8,17 @@
 	import { Settings2 } from "lucide-svelte";
 
 	let { children } = $props();
-	let isSettingsOpen = false;
+	let isSettingsOpen = $state(false);
+
+	function openSettings() {
+		// console.log("[settings-debug] layout: settings button clicked");
+		isSettingsOpen = true;
+	}
+
+	function closeSettings() {
+		// console.log("[settings-debug] layout: close callback received");
+		isSettingsOpen = false;
+	}
 </script>
 
 <svelte:head>
@@ -17,7 +27,7 @@
 
 <button
 	class="fixed right-4 top-4 z-40 inline-flex h-11 w-11 items-center justify-center rounded-full border border-gray-700 bg-gray-900/90 text-gray-200 shadow-lg shadow-black/30 backdrop-blur transition hover:border-cyan-400 hover:text-cyan-300"
-	onclick={() => (isSettingsOpen = true)}
+	onclick={openSettings}
 	aria-label="Open settings"
 >
 	<Settings2 size={18} />
@@ -27,7 +37,7 @@
 
 <SettingsModal
 	isOpen={isSettingsOpen}
-	onClose={() => (isSettingsOpen = false)}
+	onClose={closeSettings}
 />
 <ConsoleLog />
 <ToastContainer />
