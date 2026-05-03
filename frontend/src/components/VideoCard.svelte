@@ -10,8 +10,6 @@
         Plus,
         Edit2,
         Trash2,
-        Ban,
-        Filter,
         Image as ImageIcon,
         Info,
         Scissors,
@@ -29,9 +27,6 @@
     let playTimeout: any;
     let thumbnailError = false;
     let hasInteracted = false; // To lazy load video
-
-    // Tag Menu State
-    let activeTagMenu: string | null = null;
 
     let pauseTimeout: any;
 
@@ -53,7 +48,6 @@
 
     function handleMouseLeave() {
         isHovering = false;
-        activeTagMenu = null;
         clearTimeout(playTimeout);
 
         if (videoRef && !videoRef.paused) {
@@ -94,43 +88,11 @@
     // Tag Actions
     function handleTagClick(e: Event, tag: string) {
         e.stopPropagation();
-        activeTagMenu = activeTagMenu === tag ? null : tag;
+        filterByTag(tag);
     }
 
     function filterByTag(tag: string) {
         goto(`${base}/tags/${encodeURIComponent(tag)}`);
-    }
-
-    async function removeTagFromVideo(tag: string) {
-        if (confirm(`Remove tag "${tag}" from this video?`)) {
-            await videoStore.removeTag(video.name, tag);
-            activeTagMenu = null;
-        }
-    }
-
-    async function handleRenameTag(tag: string) {
-        const newName = prompt("Rename tag globally:", tag);
-        if (newName && newName !== tag) {
-            try {
-                await api.renameTag(tag, newName);
-                dispatch("refresh");
-                activeTagMenu = null;
-            } catch (e) {
-                alert("Failed to rename tag");
-            }
-        }
-    }
-
-    async function handleBlacklistTag(tag: string) {
-        if (confirm(`Blacklist "${tag}"? (Removes from all videos + Bans)`)) {
-            try {
-                await api.blacklistTag(tag);
-                dispatch("refresh");
-                activeTagMenu = null;
-            } catch (e) {
-                alert("Failed to blacklist tag");
-            }
-        }
     }
 
     async function generateThumbnail(e: Event) {
@@ -389,50 +351,12 @@
         {#if video.tags && video.tags.length > 0}
             <div class="flex flex-wrap gap-1.5 relative">
                 {#each video.tags as tag}
-                    <!-- svelte-ignore a11y-click-events-have-key-events -->
-                    <div class="relative">
-                        <button
-                            class="text-[11px] bg-gray-800 border border-gray-700 hover:border-gray-500 text-gray-300 px-2 py-0.5 rounded-full transition cursor-pointer select-none flex items-center gap-1 group/tag"
-                            on:click={(e) => handleTagClick(e, tag)}
-                        >
-                            {tag}
-                        </button>
-
-                        <!-- Tag Context Menu -->
-                        {#if activeTagMenu === tag}
-                            <div
-                                class="absolute bottom-full left-0 mb-2 w-48 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50 overflow-hidden flex flex-col text-sm animate-in fade-in slide-in-from-bottom-2 duration-100"
-                                role="button"
-                                tabindex="0"
-                                on:click|stopPropagation
-                            >
-                                <button
-                                    on:click={() => filterByTag(tag)}
-                                    class="px-3 py-2 text-left hover:bg-gray-700 flex items-center gap-2 text-gray-200"
-                                >
-                                    <Filter size={14} /> Filter videos
-                                </button>
-                                <button
-                                    on:click={() => removeTagFromVideo(tag)}
-                                    class="px-3 py-2 text-left hover:bg-gray-700 flex items-center gap-2 text-orange-400"
-                                >
-                                    <Trash2 size={14} /> Remove from this video
-                                </button>
-                                <button
-                                    on:click={() => handleRenameTag(tag)}
-                                    class="px-3 py-2 text-left hover:bg-gray-700 flex items-center gap-2 text-blue-400"
-                                >
-                                    <Edit2 size={14} /> Rename globally
-                                </button>
-                                <button
-                                    on:click={() => handleBlacklistTag(tag)}
-                                    class="px-3 py-2 text-left hover:bg-gray-700 flex items-center gap-2 text-red-500 border-t border-gray-700"
-                                >
-                                    <Ban size={14} /> Blacklist & Ban
-                                </button>
-                            </div>
-                        {/if}
-                    </div>
+                    <button
+                        class="text-[11px] bg-gray-800 border border-gray-700 hover:border-gray-500 text-gray-300 px-2 py-0.5 rounded-full transition cursor-pointer select-none flex items-center gap-1 group/tag"
+                        on:click={(e) => handleTagClick(e, tag)}
+                    >
+                        {tag}
+                    </button>
                 {/each}
             </div>
         {/if}
