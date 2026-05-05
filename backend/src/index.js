@@ -1,8 +1,10 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
 const dotenv = require('dotenv');
 const http = require('http');
+const { pathToFileURL } = require('url');
 const { Server } = require('socket.io');
 const videoRoutes = require('./routes/videos');
 const uploadRoutes = require('./routes/upload');
@@ -14,7 +16,18 @@ const config = require('./config');
 
 dotenv.config();
 
-const setupVideoGallery = (app, serverOrIo) => {
+const loadFrontendHandler = async () => {
+    const frontendHandlerPath = path.resolve(__dirname, '../../frontend/build/handler.js');
+
+    if (!fs.existsSync(frontendHandlerPath)) {
+        return null;
+    }
+
+    const frontendModule = await import(pathToFileURL(frontendHandlerPath).href);
+    return frontendModule.handler || null;
+};
+
+const setupVideoGallery = async (app, serverOrIo) => {
     // Determine if we got an IO instance or a Server instance
     let io;
     if (serverOrIo instanceof http.Server || (serverOrIo.constructor && serverOrIo.constructor.name === 'Server')) {
@@ -42,15 +55,6 @@ const setupVideoGallery = (app, serverOrIo) => {
     // Serve static assets (videos)
     app.use('/assets', express.static(config.assetsDir));
 
-    // Serve Frontend
-    const frontendBuildPath = path.join(__dirname, '../../frontend/build');
-    app.use('/videos', express.static(frontendBuildPath));
-
-    // SPA Fallback for /videos routes
-    app.use('/videos/*', (req, res) => {
-        res.sendFile(path.join(frontendBuildPath, 'index.html'));
-    });
-
     // Routes
     app.use('/api/videos', videoRoutes);
     app.use('/api/upload', uploadRoutes);
@@ -72,6 +76,13 @@ const setupVideoGallery = (app, serverOrIo) => {
         res.send('Video Gallery Backend is active');
     });
 
+    const frontendHandler = await loadFrontendHandler();
+    if (frontendHandler) {
+        app.use(frontendHandler);
+    } else {
+        console.warn('Svelte frontend handler not found at frontend/build/handler.js. Run the frontend build first.');
+    }
+
     // Initialize Socket.IO
     socketHandler(io);
 
@@ -84,15 +95,20 @@ if (require.main === module) {
     const server = http.createServer(app);
     const port = process.env.PORT || 5000;
 
-    setupVideoGallery(app, server);
+    setupVideoGallery(app, server)
+        .then(() => {
+            app.get('/', (req, res) => {
+                res.send('Video Gallery Backend is running');
+            });
 
-    app.get('/', (req, res) => {
-        res.send('Video Gallery Backend is running');
-    });
-
-    server.listen(port, () => {
-        console.log(`Server is running on port ${port}`);
-    });
+            server.listen(port, () => {
+                console.log(`Server is running on port ${port}`);
+            });
+        })
+        .catch((error) => {
+            console.error('Failed to initialize backend:', error);
+            process.exit(1);
+        });
 }
 
 module.exports = setupVideoGallery;
