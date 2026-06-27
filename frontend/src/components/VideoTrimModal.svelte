@@ -16,14 +16,20 @@
     let isPlaying = false;
     let saveAsNew = true;
     let newName = "";
+    let lastVideoName = "";
 
     // Reset state when opening
-    $: if (isOpen && video) {
+    $: if (isOpen && video && video.name !== lastVideoName) {
+        lastVideoName = video.name;
         startTime = 0;
         endTime = 0; // Will update once metadata loads
         currentTime = 0;
         newName = `trimmed-${video.name}`;
         if (videoEl) videoEl.load();
+    }
+
+    $: if (!isOpen) {
+        lastVideoName = "";
     }
 
     function handleLoadedMetadata() {
@@ -65,6 +71,14 @@
             videoEl.pause();
             isPlaying = false;
         }
+    }
+
+    function handleTimelineClick(e) {
+        if (!duration || !videoEl) return;
+        const rect = e.currentTarget.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const percentage = Math.max(0, Math.min(1, x / rect.width));
+        videoEl.currentTime = percentage * duration;
     }
 
     function previewTrim() {
@@ -187,9 +201,12 @@
                             >
                         </div>
 
-                        <!-- Scrubber / Range Visualization (Visual Only for now) -->
+                        <!-- Scrubber / Range Visualization -->
+                        <!-- svelte-ignore a11y-click-events-have-key-events -->
+                        <!-- svelte-ignore a11y-no-static-element-interactions -->
                         <div
-                            class="h-2 bg-gray-700 rounded-full relative overflow-hidden"
+                            class="h-2 bg-gray-700 rounded-full relative overflow-hidden cursor-pointer"
+                            on:click={handleTimelineClick}
                         >
                             <div
                                 class="absolute top-0 bottom-0 bg-red-500/30"

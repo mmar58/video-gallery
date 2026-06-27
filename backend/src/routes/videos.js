@@ -353,7 +353,7 @@ router.post('/:filename/trim', (req, res) => {
     }
 
     const ffmpeg = require('fluent-ffmpeg');
-    const ffmpegPath = require('ffmpeg-static');
+    const ffmpegPath = 'ffmpeg';
     ffmpeg.setFfmpegPath(ffmpegPath);
 
     const outputName = saveAsNew && newName ? newName : (saveAsNew ? `trimmed-${Date.now()}-${filename}` : `temp-${filename}`);
