@@ -13,9 +13,9 @@ const config = {
 			precompress: false,
 			envPrefix: ''
 		}),
-		paths: {
-			base: '/videos'
-		}
+		// paths: {
+		// 	base: '/videos'
+		// }
 	}
 };
 

@@ -97,10 +97,6 @@ if (require.main === module) {
 
     setupVideoGallery(app, server)
         .then(() => {
-            app.get('/', (req, res) => {
-                res.send('Video Gallery Backend is running');
-            });
-
             server.listen(port, () => {
                 console.log(`Server is running on port ${port}`);
             });
