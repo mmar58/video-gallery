@@ -2,11 +2,12 @@ import { SOCKET_URL } from "./socket.js"
 const API_URL = `${SOCKET_URL}/api/videos`;
 
 export const api = {
-    async fetchVideos(search = '', sort = 'name', page = 1, limit = 12, tag = '', days = '', dateFrom = '', dateTo = '') {
+    async fetchVideos(search = '', sort = 'name', page = 1, limit = 12, tag = '', days = '', dateFrom = '', dateTo = '', hidden = false) {
         let query = `${API_URL}?search=${encodeURIComponent(search)}&sort=${sort}&page=${page}&limit=${limit}&tag=${encodeURIComponent(tag)}`;
         if (days) query += `&days=${days}`;
         if (dateFrom) query += `&dateFrom=${dateFrom}`;
         if (dateTo) query += `&dateTo=${dateTo}`;
+        if (hidden) query += `&hidden=true`;
 
         const res = await fetch(query);
         return await res.json();
@@ -158,6 +159,15 @@ export const api = {
 
     async likeVideo(filename) {
         const res = await fetch(`${API_URL}/${filename}/like`, { method: 'POST' });
+        return await res.json();
+    },
+
+    async hideVideo(filename, days) {
+        const res = await fetch(`${API_URL}/${filename}/hide`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ days: Number(days) })
+        });
         return await res.json();
     },
 

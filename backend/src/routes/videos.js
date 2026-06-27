@@ -33,18 +33,29 @@ router.get('/', (req, res) => {
                     size: stats.size,
                     created: stats.birthtime,
                     likes: meta.likes,
-                    tags: meta.tags
+                    tags: meta.tags,
+                    hideUntil: meta.hideUntil
                 };
             });
 
         // Search
-        const { search, tag, sort, days, dateFrom, dateTo } = req.query;
+        const { search, tag, sort, days, dateFrom, dateTo, hidden } = req.query;
         if (search) {
             const lowerSearch = search.toLowerCase();
             videos = videos.filter(v => v.name.toLowerCase().includes(lowerSearch) || v.tags.some(t => t.toLowerCase().includes(lowerSearch)));
         }
         if (tag) {
             videos = videos.filter(v => v.tags.includes(tag));
+        }
+
+        // Hidden Filter
+        const nowMs = Date.now();
+        if (hidden === 'true') {
+            // Show ONLY hidden videos
+            videos = videos.filter(v => v.hideUntil && v.hideUntil > nowMs);
+        } else {
+            // Show only NON-hidden videos
+            videos = videos.filter(v => !v.hideUntil || v.hideUntil <= nowMs);
         }
 
         // Date Filtering
@@ -138,6 +149,19 @@ router.post('/:filename/like', (req, res) => {
     const meta = store.update(req.params.filename, {
         likes: (store.get(req.params.filename).likes || 0) + 1
     });
+    res.json(meta);
+});
+
+// POST /api/videos/:filename/hide - Hide video for X days
+router.post('/:filename/hide', (req, res) => {
+    const { days } = req.body;
+    let hideUntil = null;
+    
+    if (days && typeof days === 'number' && days > 0) {
+        hideUntil = Date.now() + days * 24 * 60 * 60 * 1000;
+    }
+    
+    const meta = store.update(req.params.filename, { hideUntil });
     res.json(meta);
 });
 

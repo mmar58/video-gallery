@@ -13,6 +13,8 @@
         Image as ImageIcon,
         Info,
         Scissors,
+        EyeOff,
+        Eye,
     } from "lucide-svelte";
     import { toast } from "../stores/toastStore";
     import { logStore } from "../stores/logStore";
@@ -118,6 +120,22 @@
                 `Error generating thumbnail for ${video.name}: ${err.message}`,
                 "error",
             );
+        }
+    }
+
+    function handleHide(e: Event) {
+        e.stopPropagation();
+        if (video.hideUntil && video.hideUntil > Date.now()) {
+            // Already hidden, unhide
+            videoStore.hideVideo(video.name, 0);
+        } else {
+            const daysStr = prompt("Hide for how many days?", "7");
+            if (daysStr) {
+                const days = parseInt(daysStr, 10);
+                if (!isNaN(days) && days > 0) {
+                    videoStore.hideVideo(video.name, days);
+                }
+            }
         }
     }
 
@@ -301,6 +319,17 @@
                 title="Trim Video"
             >
                 <Scissors size={16} />
+            </button>
+            <button
+                on:click={handleHide}
+                class="bg-black/60 p-2 rounded-full hover:bg-cyan-500/80 text-white backdrop-blur-sm transition"
+                title={video.hideUntil && video.hideUntil > Date.now() ? "Unhide" : "Hide"}
+            >
+                {#if video.hideUntil && video.hideUntil > Date.now()}
+                    <Eye size={16} />
+                {:else}
+                    <EyeOff size={16} />
+                {/if}
             </button>
             <button
                 on:click={handleRename}

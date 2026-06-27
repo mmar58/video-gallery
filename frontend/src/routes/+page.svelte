@@ -26,6 +26,7 @@
     let tagValue = "";
     let dateFrom = "";
     let dateTo = "";
+    let isHidden = false;
     let isMounted = false;
     let jumpToPage = 1;
 
@@ -35,19 +36,25 @@
         searchValue = query.get("search") || "";
         sortValue = query.get("sort") || "name";
         tagValue = query.get("tag") || "";
+        isHidden = query.get("hidden") === "true";
         const p = parseInt(query.get("page") || "1");
         jumpToPage = p;
 
         // Initial load
-        await videoStore.load(searchValue, sortValue, p, tagValue);
+        await videoStore.load(searchValue, sortValue, p, tagValue, "", "", "", isHidden);
         isMounted = true;
     });
+
+    // React to URL changes for hidden state (from layout button)
+    $: if (isMounted && ($page.url.searchParams.get("hidden") === "true") !== isHidden) {
+        isHidden = $page.url.searchParams.get("hidden") === "true";
+    }
 
     // React to Filter Changes (User Input) -> Load Data
     // We explicitly exclude $videoStore.page from dependencies to avoid loops.
     // When filters change, we reset to page 1.
     $: if (isMounted) {
-        // Triggers when searchValue, sortValue, or tagValue changes
+        // Triggers when searchValue, sortValue, tagValue or isHidden changes
         // This is safe because it doesn't depend on store state
         videoStore.load(
             searchValue,
@@ -57,6 +64,7 @@
             "",
             dateFrom,
             dateTo,
+            isHidden
         );
     }
 
@@ -68,8 +76,8 @@
 
         if (s.search) query.set("search", s.search);
         if (s.sort !== "name") query.set("sort", s.sort);
-        if (s.sort !== "name") query.set("sort", s.sort);
         if (s.selectedTag) query.set("tag", s.selectedTag);
+        if (s.showHidden) query.set("hidden", "true");
         if (s.page > 1) query.set("page", s.page.toString());
         jumpToPage = s.page;
 

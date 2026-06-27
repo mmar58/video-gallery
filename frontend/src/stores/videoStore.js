@@ -16,17 +16,18 @@ function createVideoStore() {
         selectedTag: '', // Current filter
         days: '',
         dateFrom: '',
-        dateTo: ''
+        dateTo: '',
+        showHidden: false
     });
 
     return {
         subscribe,
-        load: async (search = '', sort = 'name', page = 1, tag = '', days = '', dateFrom = '', dateTo = '') => {
-            update(s => ({ ...s, loading: true, search, sort, page, selectedTag: tag, days, dateFrom, dateTo }));
+        load: async (search = '', sort = 'name', page = 1, tag = '', days = '', dateFrom = '', dateTo = '', showHidden = false) => {
+            update(s => ({ ...s, loading: true, search, sort, page, selectedTag: tag, days, dateFrom, dateTo, showHidden }));
             try {
                 // Fetch stats generally once or refresh
                 const [videoData, tagsData, statsData] = await Promise.all([
-                    api.fetchVideos(search, sort, page, 12, tag, days, dateFrom, dateTo),
+                    api.fetchVideos(search, sort, page, 12, tag, days, dateFrom, dateTo, showHidden),
                     api.fetchTags(),
                     api.fetchStats()
                 ]);
@@ -54,11 +55,11 @@ function createVideoStore() {
 
             // Trigger load logic (which updates store)
             // We reuse the load function logic here to avoid duplication or circular dependency
-            const { search, sort, selectedTag, days, dateFrom, dateTo } = currentState;
+            const { search, sort, selectedTag, days, dateFrom, dateTo, showHidden } = currentState;
 
             update(s => ({ ...s, loading: true, page }));
 
-            api.fetchVideos(search, sort, page, 12, selectedTag, days, dateFrom, dateTo)
+            api.fetchVideos(search, sort, page, 12, selectedTag, days, dateFrom, dateTo, showHidden)
                 .then(data => {
                     update(s => ({
                         ...s,
@@ -118,6 +119,13 @@ function createVideoStore() {
         },
         remove: async (filename) => {
             await api.deleteVideo(filename);
+            update(s => ({
+                ...s,
+                videos: s.videos.filter(v => v.name !== filename)
+            }));
+        },
+        hideVideo: async (filename, days) => {
+            await api.hideVideo(filename, days);
             update(s => ({
                 ...s,
                 videos: s.videos.filter(v => v.name !== filename)
