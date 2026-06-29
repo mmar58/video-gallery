@@ -340,7 +340,7 @@ router.delete('/:filename/tags/:tag', (req, res) => {
 
 // POST /api/videos/:filename/trim - Trim video
 router.post('/:filename/trim', (req, res) => {
-    const { start, end, saveAsNew, newName } = req.body;
+    const { start, end, saveAsNew, newName, overwriteTarget } = req.body;
     const filename = req.params.filename;
     const filePath = getPath(filename);
 
@@ -356,49 +356,46 @@ router.post('/:filename/trim', (req, res) => {
     const ffmpegPath = 'ffmpeg';
     ffmpeg.setFfmpegPath(ffmpegPath);
 
-    const outputName = saveAsNew && newName ? newName : (saveAsNew ? `trimmed-${Date.now()}-${filename}` : `temp-${filename}`);
-    // Ensure output extension matches input
+    const outputName = saveAsNew && newName ? newName : (saveAsNew ? `trimmed-${Date.now()}-${filename}` : filename);
     const ext = path.extname(filename);
     const finalOutputName = path.extname(outputName) === ext ? outputName : outputName + ext;
     const outputPath = getPath(finalOutputName);
 
+    // Check for conflict
     if (fs.existsSync(outputPath)) {
-        return res.status(409).json({ error: 'Output file already exists' });
+        if (!overwriteTarget) {
+            return res.status(409).json({ error: 'FILE_EXISTS' });
+        }
+    }
+
+    const isSelfOverwrite = outputPath === filePath;
+    const actualOutputPath = isSelfOverwrite ? getPath(`temp-trim-${Date.now()}-${filename}`) : outputPath;
+
+    // If overwriting a different file, delete it first to avoid FFmpeg issues
+    if (fs.existsSync(actualOutputPath)) {
+        fs.unlinkSync(actualOutputPath);
     }
 
     ffmpeg(filePath)
         .setStartTime(start)
         .setDuration(parseFloat(end) - parseFloat(start))
-        .output(outputPath)
+        .output(actualOutputPath)
         .on('end', () => {
-            if (saveAsNew) {
-                // Add to store
-                store.add(finalOutputName);
-                // Generate assets
-                require('../services/thumbnailService').generateThumbnail(finalOutputName);
-                require('../services/thumbnailService').generatePreview(finalOutputName);
-
-                res.json({ success: true, newFile: finalOutputName });
-            } else {
-                // Replace original
-                // 1. Delete original
+            if (isSelfOverwrite) {
                 fs.unlink(filePath, (err) => {
-                    if (err) {
-                        console.error("Failed to delete original after trim:", err);
-                        // Try to keep temp file at least?
-                        return res.status(500).json({ error: 'Failed to replace file' });
-                    }
-                    // 2. Rename temp to original
-                    fs.rename(outputPath, filePath, (err) => {
+                    if (err) return res.status(500).json({ error: 'Failed to replace file' });
+                    fs.rename(actualOutputPath, filePath, (err) => {
                         if (err) return res.status(500).json({ error: 'Failed to rename temp file' });
-
-                        // Regenerate assets for the modified video
                         require('../services/thumbnailService').generateThumbnail(filename);
                         require('../services/thumbnailService').generatePreview(filename);
-
                         res.json({ success: true });
                     });
                 });
+            } else {
+                store.add(finalOutputName);
+                require('../services/thumbnailService').generateThumbnail(finalOutputName);
+                require('../services/thumbnailService').generatePreview(finalOutputName);
+                res.json({ success: true, newFile: finalOutputName });
             }
         })
         .on('error', (err) => {
@@ -406,6 +403,51 @@ router.post('/:filename/trim', (req, res) => {
             res.status(500).json({ error: 'Failed to trim video' });
         })
         .run();
+});
+
+// POST /api/videos/:filename/split - Split video
+router.post('/:filename/split', (req, res) => {
+    const { splitTime } = req.body;
+    const filename = req.params.filename;
+    const filePath = getPath(filename);
+
+    if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'File not found' });
+    if (splitTime === undefined) return res.status(400).json({ error: 'Split time required' });
+
+    const ffmpeg = require('fluent-ffmpeg');
+    const ffmpegPath = 'ffmpeg';
+    ffmpeg.setFfmpegPath(ffmpegPath);
+
+    const ext = path.extname(filename);
+    const basename = path.basename(filename, ext);
+    
+    const part1Name = `${basename}-part1${ext}`;
+    const part2Name = `${basename}-part2${ext}`;
+    
+    const part1Path = getPath(part1Name);
+    const part2Path = getPath(part2Name);
+
+    const runFfmpeg = (command) => new Promise((resolve, reject) => {
+        command.on('end', resolve).on('error', reject).run();
+    });
+
+    const cmd1 = ffmpeg(filePath).setStartTime(0).setDuration(parseFloat(splitTime)).output(part1Path);
+    const cmd2 = ffmpeg(filePath).setStartTime(parseFloat(splitTime)).output(part2Path);
+
+    Promise.all([runFfmpeg(cmd1), runFfmpeg(cmd2)])
+        .then(() => {
+            store.add(part1Name);
+            store.add(part2Name);
+            require('../services/thumbnailService').generateThumbnail(part1Name);
+            require('../services/thumbnailService').generatePreview(part1Name);
+            require('../services/thumbnailService').generateThumbnail(part2Name);
+            require('../services/thumbnailService').generatePreview(part2Name);
+            res.json({ success: true, files: [part1Name, part2Name] });
+        })
+        .catch(err => {
+            console.error('Error splitting video:', err);
+            res.status(500).json({ error: 'Failed to split video' });
+        });
 });
 
 module.exports = router;

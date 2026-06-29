@@ -17,6 +17,8 @@
     let saveAsNew = true;
     let newName = "";
     let lastVideoName = "";
+    let mode = "trim"; // 'trim' or 'split'
+    let splitTime = 0;
 
     // Reset state when opening
     $: if (isOpen && video && video.name !== lastVideoName) {
@@ -24,7 +26,9 @@
         startTime = 0;
         endTime = 0; // Will update once metadata loads
         currentTime = 0;
-        newName = `trimmed-${video.name}`;
+        splitTime = 0;
+        mode = "trim";
+        newName = video.name;
         if (videoEl) videoEl.load();
     }
 
@@ -87,7 +91,12 @@
         isPlaying = true;
     }
 
-    async function handleTrim() {
+    function setSplitTime() {
+        splitTime = videoEl.currentTime;
+        toast.info(`Split time set to ${formatTime(splitTime)}`);
+    }
+
+    async function handleTrim(overwriteTarget = false) {
         if (startTime >= endTime) {
             toast.error("Invalid trim range");
             return;
@@ -101,13 +110,41 @@
                 endTime,
                 saveAsNew,
                 newName,
+                overwriteTarget
             );
-            toast.success("Video trimmed successfully!");
+            toast.success(overwriteTarget ? "Video replaced successfully!" : "Video trimmed successfully!");
             dispatch("refresh"); // Reload list
             close();
         } catch (e) {
+            if (e.message === "FILE_EXISTS") {
+                const confirmReplace = confirm("File already exists. Do you want to replace it?");
+                if (confirmReplace) {
+                    await handleTrim(true);
+                } else {
+                    toast.info("Trim cancelled.");
+                }
+            } else {
+                console.error(e);
+                toast.error(`Trim failed: ${e.message}`);
+            }
+        }
+    }
+
+    async function handleSplit() {
+        if (splitTime <= 0 || splitTime >= duration) {
+            toast.error("Invalid split time");
+            return;
+        }
+
+        try {
+            toast.info("Splitting video...");
+            await api.splitVideo(video.name, splitTime);
+            toast.success("Video split successfully!");
+            dispatch("refresh");
+            close();
+        } catch (e) {
             console.error(e);
-            toast.error(`Trim failed: ${e.message}`);
+            toast.error(`Split failed: ${e.message}`);
         }
     }
 
@@ -181,9 +218,26 @@
                         </div>
                     {/if}
                 </div>
+                
+                <!-- Mode Toggle -->
+                <div class="flex gap-4 border-b border-gray-800 pb-2">
+                    <button 
+                        on:click={() => mode = 'trim'} 
+                        class="text-sm font-semibold transition-colors {mode === 'trim' ? 'text-red-500' : 'text-gray-400 hover:text-white'}"
+                    >
+                        Trim Mode
+                    </button>
+                    <button 
+                        on:click={() => mode = 'split'} 
+                        class="text-sm font-semibold transition-colors {mode === 'split' ? 'text-red-500' : 'text-gray-400 hover:text-white'}"
+                    >
+                        Split Mode
+                    </button>
+                </div>
 
                 <!-- Controls -->
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {#if mode === 'trim'}
                     <!-- Time Controls -->
                     <div
                         class="space-y-4 bg-gray-800/50 p-4 rounded-lg border border-gray-700"
@@ -302,13 +356,61 @@
                         {/if}
 
                         <button
-                            on:click={handleTrim}
+                            on:click={() => handleTrim(false)}
                             class="w-full mt-auto py-3 bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-500 hover:to-orange-500 text-white font-bold rounded shadow-lg flex items-center justify-center gap-2 transition transform active:scale-95"
                         >
                             <Scissors size={20} />
                             {saveAsNew ? "Trim & Save" : "Trim & Overwrite"}
                         </button>
                     </div>
+                    {:else}
+                    <!-- Split Controls -->
+                    <div class="space-y-4 bg-gray-800/50 p-4 rounded-lg border border-gray-700">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-gray-400 text-sm font-mono"
+                                >Current: {formatTime(currentTime)} / {formatTime(duration)}</span
+                            >
+                        </div>
+                        <div
+                            class="h-2 bg-gray-700 rounded-full relative overflow-hidden cursor-pointer"
+                            on:click={handleTimelineClick}
+                        >
+                            <div
+                                class="absolute top-0 bottom-0 w-1 bg-red-500"
+                                style="left: {(splitTime / duration) * 100}%"
+                            ></div>
+                            <div
+                                class="absolute top-0 bottom-0 w-1 bg-white"
+                                style="left: {(currentTime / duration) * 100}%"
+                            ></div>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-400 mb-1">Split Point</label>
+                            <div class="flex gap-2">
+                                <input
+                                    type="number"
+                                    step="0.1"
+                                    bind:value={splitTime}
+                                    class="w-full bg-gray-900 border border-gray-600 rounded px-2 py-1 text-white"
+                                />
+                                <button
+                                    on:click={setSplitTime}
+                                    class="px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs text-white"
+                                >Set Current</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="space-y-4 bg-gray-800/50 p-4 rounded-lg border border-gray-700 flex flex-col justify-center">
+                        <p class="text-sm text-gray-300">This will split the video into two parts exactly at the specified point, creating two new files.</p>
+                        <button
+                            on:click={handleSplit}
+                            class="w-full mt-auto py-3 bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-500 hover:to-orange-500 text-white font-bold rounded shadow-lg flex items-center justify-center gap-2 transition transform active:scale-95"
+                        >
+                            <Scissors size={20} />
+                            Split Video
+                        </button>
+                    </div>
+                    {/if}
                 </div>
             </div>
         </div>

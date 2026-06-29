@@ -214,15 +214,28 @@ export const api = {
         return await res.json();
     },
 
-    async trimVideo(filename, start, end, saveAsNew, newName) {
+    async trimVideo(filename, start, end, saveAsNew, newName, overwriteTarget = false) {
         const res = await fetch(`${API_URL}/${filename}/trim`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ start, end, saveAsNew, newName })
+            body: JSON.stringify({ start, end, saveAsNew, newName, overwriteTarget })
         });
         if (!res.ok) {
             const err = await res.json();
             throw new Error(err.error || 'Trim failed');
+        }
+        return await res.json();
+    },
+
+    async splitVideo(filename, splitTime) {
+        const res = await fetch(`${API_URL}/${filename}/split`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ splitTime })
+        });
+        if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.error || 'Split failed');
         }
         return await res.json();
     }
