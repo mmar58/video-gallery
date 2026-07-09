@@ -34,6 +34,14 @@ module.exports = {
     getAll: () => metadata,
     get: (filename) => metadata[filename] || { likes: 0, tags: [] },
 
+    add: (filename) => {
+        if (!metadata[filename]) {
+            metadata[filename] = { likes: 0, tags: [] };
+            save();
+        }
+        return metadata[filename];
+    },
+
     update: (filename, updates) => {
         const current = metadata[filename] || { likes: 0, tags: [] };
         metadata[filename] = { ...current, ...updates };

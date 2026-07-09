@@ -82,7 +82,7 @@
         jumpToPage = s.page;
 
         const queryString = query.toString();
-        const url = queryString ? `?${queryString}` : "/";
+        const url = queryString ? `?${queryString}` : "";
 
         if ($page.url.search !== (queryString ? `?${queryString}` : "")) {
             goto(`${base}/${url}`, {
