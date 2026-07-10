@@ -282,6 +282,34 @@ router.post('/:filename/tags', (req, res) => {
     }
 });
 
+// POST /api/videos/:filename/regenerate-tags - Regenerate tags
+router.post('/:filename/regenerate-tags', async (req, res) => {
+    try {
+        const { modelName } = req.body;
+        const filename = req.params.filename;
+        const { generateTagsFromText } = require('../services/ollamaService');
+        
+        const baseName = path.parse(filename).name;
+        const prompt = "Generate 5-10 relevant keywords or tags based on this text. Comma separated, no intro.";
+        
+        const ollamaResponse = await generateTagsFromText(modelName, baseName, prompt);
+        
+        const newTags = ollamaResponse.split(',')
+            .map(t => t.trim().toLowerCase().replace(/[^a-z0-9\s-]/g, ''))
+            .filter(t => t.length > 1 && t.length < 30);
+            
+        const currentMeta = store.get(filename);
+        const currentTags = currentMeta.tags || [];
+        const combinedTags = [...new Set([...currentTags, ...newTags])];
+        
+        const meta = store.update(filename, { tags: combinedTags });
+        res.json(meta);
+    } catch (error) {
+        console.error('Error regenerating tags:', error);
+        res.status(500).json({ error: 'Failed to regenerate tags' });
+    }
+});
+
 // DELETE /api/videos/:filename/tags/:tag - Remove tag
 router.delete('/:filename/tags/:tag', (req, res) => {
     const { tag } = req.params;

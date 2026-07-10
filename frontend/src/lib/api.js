@@ -150,6 +150,15 @@ export const api = {
         return await res.json();
     },
 
+    async regenerateTags(filename, modelName) {
+        const res = await fetch(`${API_URL}/${filename}/regenerate-tags`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ modelName })
+        });
+        return await res.json();
+    },
+
     async removeTag(filename, tag) {
         const res = await fetch(`${API_URL}/${filename}/tags/${tag}`, {
             method: 'DELETE'

@@ -27,9 +27,14 @@
     let assets = [];
     let loadingAssets = false;
     let newTag = "";
+    
+    let models = [];
+    let selectedModel = "";
+    let regeneratingTags = false;
 
     $: if (isOpen && video) {
         loadAssets();
+        loadModels();
     }
 
     function close() {
@@ -96,6 +101,34 @@
             loadAssets();
         } catch (e) {
             toast.error("Failed to regenerate preview");
+        }
+    }
+
+    async function loadModels() {
+        if (models.length > 0) return;
+        try {
+            const m = await api.getModels();
+            models = m.map(item => item.name);
+            if (models.length > 0) selectedModel = models[0];
+        } catch (e) {
+            console.error("Failed to load models", e);
+        }
+    }
+
+    async function regenerateTags() {
+        if (!selectedModel) return;
+        try {
+            regeneratingTags = true;
+            toast.info("Regenerating tags with Ollama...");
+            const updated = await api.regenerateTags(video.name, selectedModel);
+            video.tags = updated.tags;
+            dispatch("refresh");
+            toast.success("Tags regenerated and added");
+            logStore.add(`Regenerated tags for ${video.name}`, "success");
+        } catch (e) {
+            toast.error("Failed to regenerate tags");
+        } finally {
+            regeneratingTags = false;
         }
     }
 
@@ -331,11 +364,25 @@
 
                 <!-- Tags Management -->
                 <div class="flex-1">
-                    <h4
-                        class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2"
-                    >
-                        <Tag size={14} /> Manage Tags
-                    </h4>
+                    <div class="flex items-center justify-between mb-3">
+                        <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
+                            <Tag size={14} /> Manage Tags
+                        </h4>
+                        
+                        {#if models.length > 0}
+                        <div class="flex items-center gap-2">
+                            <select bind:value={selectedModel} class="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-white focus:outline-none">
+                                {#each models as m}
+                                    <option value={m}>{m}</option>
+                                {/each}
+                            </select>
+                            <button class="bg-gray-800 hover:bg-gray-700 text-gray-300 px-2 py-1 rounded text-xs flex items-center gap-1 transition disabled:opacity-50" on:click={regenerateTags} disabled={regeneratingTags || !selectedModel}>
+                                <RefreshCw size={12} class={regeneratingTags ? "animate-spin" : ""} />
+                                Auto-Tag
+                            </button>
+                        </div>
+                        {/if}
+                    </div>
 
                     <div class="flex flex-wrap gap-2 mb-4">
                         {#if video.tags && video.tags.length > 0}
