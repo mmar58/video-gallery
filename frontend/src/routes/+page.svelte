@@ -29,6 +29,7 @@
     let isHidden = false;
     let isMounted = false;
     let jumpToPage = 1;
+    let lastFilterState = "";
 
     // Initialize from URL
     onMount(async () => {
@@ -39,6 +40,8 @@
         isHidden = query.get("hidden") === "true";
         const p = parseInt(query.get("page") || "1");
         jumpToPage = p;
+
+        lastFilterState = `${searchValue}|${sortValue}|${tagValue}|${dateFrom}|${dateTo}|${isHidden}`;
 
         // Initial load
         await videoStore.load(searchValue, sortValue, p, tagValue, "", "", "", isHidden);
@@ -54,18 +57,20 @@
     // We explicitly exclude $videoStore.page from dependencies to avoid loops.
     // When filters change, we reset to page 1.
     $: if (isMounted) {
-        // Triggers when searchValue, sortValue, tagValue or isHidden changes
-        // This is safe because it doesn't depend on store state
-        videoStore.load(
-            searchValue,
-            sortValue,
-            1,
-            tagValue,
-            "",
-            dateFrom,
-            dateTo,
-            isHidden
-        );
+        const currentFilters = `${searchValue}|${sortValue}|${tagValue}|${dateFrom}|${dateTo}|${isHidden}`;
+        if (lastFilterState !== "" && lastFilterState !== currentFilters) {
+            videoStore.load(
+                searchValue,
+                sortValue,
+                1,
+                tagValue,
+                "",
+                dateFrom,
+                dateTo,
+                isHidden
+            );
+        }
+        lastFilterState = currentFilters;
     }
 
     // React to Store Changes -> Sync URL

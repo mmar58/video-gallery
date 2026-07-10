@@ -124,7 +124,7 @@
 <div
   bind:this={containerEl}
   class="fixed shadow-2xl rounded-lg bg-gray-900 border border-gray-700 flex flex-col overflow-hidden player-window"
-  style="left: {left}px; top: {top}px; width: {width}px; z-index: {zIndex}; max-width: calc(100vw - {left}px); max-height: calc(100vh - {top}px);"
+  style="left: {left}px; top: {top}px; width: {width}px; z-index: {zIndex}; max-width: calc(100% - {left}px); max-height: calc(100% - {top}px);"
   on:mousedown={handleMouseDown}
   on:touchstart={handleTouchStart}
 >
@@ -161,7 +161,7 @@
   .player-window {
     min-width: 300px; /* Reduced min-width slightly for smaller phones */
     resize: both;
-    overflow: auto;
+    overflow: hidden;
   }
 
   .player-window::-webkit-scrollbar {
