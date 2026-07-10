@@ -366,16 +366,15 @@ router.delete('/:filename/tags/:tag', (req, res) => {
     res.json(meta);
 });
 
-// POST /api/videos/:filename/trim - Trim video
-router.post('/:filename/trim', (req, res) => {
-    const { start, end, saveAsNew, newName, overwriteTarget } = req.body;
+// POST /api/videos/:filename/trim - Trim or Cut video
+router.post('/:filename/trim', async (req, res) => {
+    const { start, end, mode, saveAsNew, newName, overwriteTarget } = req.body;
     const filename = req.params.filename;
     const filePath = getPath(filename);
 
     if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'File not found' });
     if (start === undefined || end === undefined) return res.status(400).json({ error: 'Start and end times required' });
 
-    // Validate times (basic)
     if (parseFloat(start) >= parseFloat(end)) {
         return res.status(400).json({ error: 'Start time must be before end time' });
     }
@@ -389,48 +388,105 @@ router.post('/:filename/trim', (req, res) => {
     const finalOutputName = path.extname(outputName) === ext ? outputName : outputName + ext;
     const outputPath = getPath(finalOutputName);
 
-    // Check for conflict
-    if (fs.existsSync(outputPath)) {
-        if (!overwriteTarget) {
-            return res.status(409).json({ error: 'FILE_EXISTS' });
-        }
+    if (fs.existsSync(outputPath) && !overwriteTarget) {
+        return res.status(409).json({ error: 'FILE_EXISTS' });
     }
 
     const isSelfOverwrite = outputPath === filePath;
     const actualOutputPath = isSelfOverwrite ? getPath(`temp-trim-${Date.now()}-${filename}`) : outputPath;
 
-    // If overwriting a different file, delete it first to avoid FFmpeg issues
     if (fs.existsSync(actualOutputPath)) {
         fs.unlinkSync(actualOutputPath);
     }
 
-    ffmpeg(filePath)
-        .setStartTime(start)
-        .setDuration(parseFloat(end) - parseFloat(start))
-        .output(actualOutputPath)
-        .on('end', () => {
-            if (isSelfOverwrite) {
-                fs.unlink(filePath, (err) => {
-                    if (err) return res.status(500).json({ error: 'Failed to replace file' });
-                    fs.rename(actualOutputPath, filePath, (err) => {
-                        if (err) return res.status(500).json({ error: 'Failed to rename temp file' });
-                        require('../services/thumbnailService').generateThumbnail(filename);
-                        require('../services/thumbnailService').generatePreview(filename);
-                        res.json({ success: true });
-                    });
+    const finalizeResponse = () => {
+        if (isSelfOverwrite) {
+            fs.unlink(filePath, (err) => {
+                if (err) return res.status(500).json({ error: 'Failed to replace file' });
+                fs.rename(actualOutputPath, filePath, (err) => {
+                    if (err) return res.status(500).json({ error: 'Failed to rename temp file' });
+                    require('../services/thumbnailService').generateThumbnail(filename);
+                    require('../services/thumbnailService').generatePreview(filename);
+                    res.json({ success: true });
                 });
-            } else {
-                store.add(finalOutputName);
-                require('../services/thumbnailService').generateThumbnail(finalOutputName);
-                require('../services/thumbnailService').generatePreview(finalOutputName);
-                res.json({ success: true, newFile: finalOutputName });
+            });
+        } else {
+            store.add(finalOutputName);
+            require('../services/thumbnailService').generateThumbnail(finalOutputName);
+            require('../services/thumbnailService').generatePreview(finalOutputName);
+            res.json({ success: true, newFile: finalOutputName });
+        }
+    };
+
+    if (mode === 'delete') {
+        const temp1 = getPath(`temp1-${Date.now()}-${filename}`);
+        const temp2 = getPath(`temp2-${Date.now()}-${filename}`);
+        const listFile = getPath(`list-${Date.now()}.txt`);
+
+        try {
+            if (parseFloat(start) > 0) {
+                await new Promise((resolve, reject) => {
+                    ffmpeg(filePath)
+                        .setStartTime(0)
+                        .setDuration(parseFloat(start))
+                        .output(temp1)
+                        .on('end', resolve)
+                        .on('error', reject)
+                        .run();
+                });
             }
-        })
-        .on('error', (err) => {
-            console.error('Error trimming video:', err);
-            res.status(500).json({ error: 'Failed to trim video' });
-        })
-        .run();
+
+            await new Promise((resolve, reject) => {
+                ffmpeg(filePath)
+                    .setStartTime(parseFloat(end))
+                    .output(temp2)
+                    .on('end', resolve)
+                    .on('error', reject)
+                    .run();
+            });
+
+            let listContent = '';
+            if (fs.existsSync(temp1)) listContent += `file '${path.basename(temp1)}'\n`;
+            if (fs.existsSync(temp2)) listContent += `file '${path.basename(temp2)}'\n`;
+            fs.writeFileSync(listFile, listContent);
+
+            await new Promise((resolve, reject) => {
+                ffmpeg()
+                    .input(listFile)
+                    .inputOptions(['-f concat', '-safe 0'])
+                    .outputOptions('-c copy')
+                    .output(actualOutputPath)
+                    .on('end', resolve)
+                    .on('error', reject)
+                    .run();
+            });
+
+            if (fs.existsSync(temp1)) fs.unlinkSync(temp1);
+            if (fs.existsSync(temp2)) fs.unlinkSync(temp2);
+            if (fs.existsSync(listFile)) fs.unlinkSync(listFile);
+
+            finalizeResponse();
+        } catch (err) {
+            console.error('Error deleting part of video:', err);
+            if (fs.existsSync(temp1)) fs.unlinkSync(temp1);
+            if (fs.existsSync(temp2)) fs.unlinkSync(temp2);
+            if (fs.existsSync(listFile)) fs.unlinkSync(listFile);
+            if (fs.existsSync(actualOutputPath)) fs.unlinkSync(actualOutputPath);
+            res.status(500).json({ error: 'Failed to delete segment' });
+        }
+    } else {
+        // Standard keep trim
+        ffmpeg(filePath)
+            .setStartTime(start)
+            .setDuration(parseFloat(end) - parseFloat(start))
+            .output(actualOutputPath)
+            .on('end', finalizeResponse)
+            .on('error', (err) => {
+                console.error('Error trimming video:', err);
+                res.status(500).json({ error: 'Failed to trim video' });
+            })
+            .run();
+    }
 });
 
 // POST /api/videos/:filename/split - Split video

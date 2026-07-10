@@ -18,6 +18,7 @@
     let newName = "";
     let lastVideoName = "";
     let mode = "trim"; // 'trim' or 'split'
+    let cutMode = "keep"; // 'keep' or 'delete'
     let splitTime = 0;
 
     // Reset state when opening
@@ -28,6 +29,7 @@
         currentTime = 0;
         splitTime = 0;
         mode = "trim";
+        cutMode = "keep";
         newName = video.name;
         if (videoEl) videoEl.load();
     }
@@ -103,16 +105,17 @@
         }
 
         try {
-            toast.info("Trimming video...");
+            toast.info(cutMode === 'delete' ? "Deleting segment..." : "Trimming video...");
             await api.trimVideo(
                 video.name,
                 startTime,
                 endTime,
+                cutMode,
                 saveAsNew,
                 newName,
                 overwriteTarget
             );
-            toast.success(overwriteTarget ? "Video replaced successfully!" : "Video trimmed successfully!");
+            toast.success(overwriteTarget ? "Video replaced successfully!" : (cutMode === 'delete' ? "Segment deleted successfully!" : "Video trimmed successfully!"));
             dispatch("refresh"); // Reload list
             close();
         } catch (e) {
@@ -319,6 +322,18 @@
                     <div
                         class="space-y-4 bg-gray-800/50 p-4 rounded-lg border border-gray-700 flex flex-col justify-center"
                     >
+                        <!-- Cut Mode Selection -->
+                        <div class="flex items-center gap-4 mb-2">
+                            <label class="flex items-center gap-2 cursor-pointer select-none">
+                                <input type="radio" bind:group={cutMode} value="keep" class="text-blue-500 focus:ring-blue-500 bg-gray-700 border-gray-600" />
+                                <span class="text-white text-sm">Keep Selection (Trim)</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer select-none">
+                                <input type="radio" bind:group={cutMode} value="delete" class="text-red-500 focus:ring-red-500 bg-gray-700 border-gray-600" />
+                                <span class="text-white text-sm">Delete Selection (Cut)</span>
+                            </label>
+                        </div>
+                        
                         <div class="flex items-center gap-2 mb-2">
                             <input
                                 type="checkbox"

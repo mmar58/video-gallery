@@ -223,11 +223,11 @@ export const api = {
         return await res.json();
     },
 
-    async trimVideo(filename, start, end, saveAsNew, newName, overwriteTarget = false) {
+    async trimVideo(filename, start, end, mode, saveAsNew, newName, overwriteTarget = false) {
         const res = await fetch(`${API_URL}/${filename}/trim`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ start, end, saveAsNew, newName, overwriteTarget })
+            body: JSON.stringify({ start, end, mode, saveAsNew, newName, overwriteTarget })
         });
         if (!res.ok) {
             const err = await res.json();
