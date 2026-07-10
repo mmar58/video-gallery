@@ -119,6 +119,24 @@
   function close() {
     dispatch("close");
   }
+
+  function handleLoadedMetadata(e) {
+    if (typeof window === "undefined") return;
+    const videoWidth = e.target.videoWidth;
+    const videoHeight = e.target.videoHeight;
+    
+    if (videoHeight > videoWidth) {
+      const vh = window.innerHeight;
+      const headerHeight = 40; 
+      const maxAvailableHeight = vh - top - headerHeight;
+      const aspectRatio = videoWidth / videoHeight;
+      const idealWidth = maxAvailableHeight * aspectRatio;
+      
+      if (idealWidth < width) {
+        width = Math.max(300, idealWidth);
+      }
+    }
+  }
 </script>
 
 <div
@@ -130,7 +148,7 @@
 >
   <!-- Header / Drag Handle -->
   <div
-    class="drag-handle bg-gray-800 p-2 cursor-move flex justify-between items-center select-none"
+    class="drag-handle bg-gray-800 p-2 cursor-move flex justify-between items-center select-none shrink-0"
   >
     <h3 class="text-white text-sm font-medium truncate px-2 max-w-[80%]">
       {video.name}
@@ -145,14 +163,15 @@
 
   <!-- Content -->
   <div
-    class="relative bg-black flex-1 flex items-center justify-center min-h-0"
+    class="relative bg-black flex-1 flex items-center justify-center min-h-0 overflow-hidden"
   >
     <video
       bind:this={videoEl}
       src={api.getStreamUrl(video.name)}
-      class="w-full h-full object-contain"
+      class="w-full h-full max-w-full max-h-full object-contain"
       controls
       autoplay
+      on:loadedmetadata={handleLoadedMetadata}
     ></video>
   </div>
 </div>
