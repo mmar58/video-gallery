@@ -145,7 +145,6 @@
     }
 
     async function removeTag(tag) {
-        if (!confirm(`Remove tag "${tag}"?`)) return;
         try {
             await videoStore.removeTag(video.name, tag);
             toast.success("Tag removed");
