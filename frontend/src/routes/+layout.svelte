@@ -22,16 +22,16 @@
 	// Route guarding
 	$effect(() => {
 		if (!$authStore.loading) {
-			const path = $page.url.pathname;
+			const path = $page.url.pathname.replace(/\/$/, '') || '/';
 			const isAuthRoute = path === '/login' || path === '/register';
 			
 			if (!$authStore.isAuthenticated && !isAuthRoute) {
-				goto('/login');
+				goto('/login/');
 			} else if ($authStore.isAuthenticated) {
 				if (isAuthRoute) {
 					goto('/');
 				} else if (!$authStore.user?.verified && path !== '/pending-verification' && path !== '/login' && path !== '/register') {
-					goto('/pending-verification');
+					goto('/pending-verification/');
 				} else if (path === '/admin' && !$authStore.user?.is_admin) {
 					goto('/');
 				}

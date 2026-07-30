@@ -53,7 +53,7 @@ router.get('/', async (req: AuthRequest, res) => {
             const videos = await Promise.all(files
                 .filter(file => {
                     const ext = path.extname(file).toLowerCase();
-                    return ['.mp4', '.webm', '.ogg', '.mov'].includes(ext);
+                    return ['.mp4', '.webm', '.ogg', '.mov', '.mkv', '.m4v', '.avi'].includes(ext);
                 })
                 .map(async file => {
                     const filePath = path.join(dir.path, file);
@@ -143,6 +143,50 @@ router.get('/', async (req: AuthRequest, res) => {
     }
 });
 
+// GET /api/videos/stats - Get video statistics (date distribution)
+router.get('/stats', async (req: AuthRequest, res) => {
+    try {
+        const userId = req.user.id;
+        const allowedDirs = await getAllowedDirectories(userId);
+        const months: Record<string, number> = {};
+        let minDate: Date | null = null;
+        let maxDate: Date | null = null;
+        let totalVideos = 0;
+        
+        for (const dir of allowedDirs) {
+            if (!fs.existsSync(dir.path)) continue;
+            
+            const files = fs.readdirSync(dir.path);
+            const videoFiles = files.filter(file => {
+                const ext = path.extname(file).toLowerCase();
+                return ['.mp4', '.webm', '.ogg', '.mov', '.mkv', '.m4v', '.avi'].includes(ext);
+            });
+            
+            for (const file of videoFiles) {
+                const filePath = path.join(dir.path, file);
+                const stats = fs.statSync(filePath);
+                const date = stats.birthtime;
+                const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+                
+                months[key] = (months[key] || 0) + 1;
+                if (!minDate || date < minDate) minDate = date;
+                if (!maxDate || date > maxDate) maxDate = date;
+                totalVideos++;
+            }
+        }
+        
+        res.json({
+            distributions: months,
+            minDate: minDate || new Date(),
+            maxDate: maxDate || new Date(),
+            totalVideos
+        });
+    } catch (error) {
+        console.error('Error fetching stats:', error);
+        res.status(500).json({ error: 'Failed to fetch stats' });
+    }
+});
+
 // GET /api/videos/:filename/stream
 router.get('/:filename/stream', async (req: AuthRequest, res) => {
     const { dirId, filename } = parseFilename(req.params.filename);
@@ -158,6 +202,13 @@ router.get('/:filename/stream', async (req: AuthRequest, res) => {
     const fileSize = stat.size;
     const range = req.headers.range as string;
 
+    const ext = path.extname(filename).toLowerCase();
+    let contentType = 'video/mp4';
+    if (ext === '.webm') contentType = 'video/webm';
+    else if (ext === '.ogg') contentType = 'video/ogg';
+    else if (ext === '.mkv') contentType = 'video/x-matroska';
+    else if (ext === '.avi') contentType = 'video/x-msvideo';
+
     if (range) {
         const parts = range.replace(/bytes=/, "").split("-");
         const start = parseInt(parts[0], 10);
@@ -168,14 +219,14 @@ router.get('/:filename/stream', async (req: AuthRequest, res) => {
             'Content-Range': `bytes ${start}-${end}/${fileSize}`,
             'Accept-Ranges': 'bytes',
             'Content-Length': chunksize,
-            'Content-Type': 'video/mp4',
+            'Content-Type': contentType,
         };
         res.writeHead(206, head);
         file.pipe(res);
     } else {
         const head = {
             'Content-Length': fileSize,
-            'Content-Type': 'video/mp4',
+            'Content-Type': contentType,
         };
         res.writeHead(200, head);
         fs.createReadStream(filePath).pipe(res);

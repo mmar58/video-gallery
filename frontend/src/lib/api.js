@@ -261,5 +261,36 @@ export const api = {
             throw new Error(err.error || 'Split failed');
         }
         return await res.json();
+    },
+
+    // --- Admin Directories ---
+    async fetchDirectories() {
+        const baseUrl = API_URL.replace('/api/videos', '');
+        const res = await fetch(`${baseUrl}/api/admin/directories`);
+        if (!res.ok) throw new Error('Failed to fetch directories');
+        return await res.json();
+    },
+
+    async addDirectory(name, path) {
+        const baseUrl = API_URL.replace('/api/videos', '');
+        const res = await fetch(`${baseUrl}/api/admin/directories`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, path })
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || 'Failed to add directory');
+        }
+        return await res.json();
+    },
+
+    async deleteDirectory(id) {
+        const baseUrl = API_URL.replace('/api/videos', '');
+        const res = await fetch(`${baseUrl}/api/admin/directories/${id}`, {
+            method: 'DELETE'
+        });
+        if (!res.ok) throw new Error('Failed to delete directory');
+        return await res.json();
     }
 };
