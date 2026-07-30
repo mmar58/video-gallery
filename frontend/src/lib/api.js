@@ -1,6 +1,14 @@
 import { SOCKET_URL } from "./socket.js"
 const API_URL = `${SOCKET_URL}/api/videos`;
 
+const getAuthToken = () => typeof localStorage !== 'undefined' ? localStorage.getItem('token') : null;
+
+const fetch = async (url, options = {}) => {
+    const token = getAuthToken();
+    const headers = token ? { ...options.headers, 'Authorization': `Bearer ${token}` } : options.headers;
+    return window.fetch(url, { ...options, headers });
+};
+
 export const api = {
     async fetchVideos(search = '', sort = 'name', page = 1, limit = 12, tag = '', days = '', dateFrom = '', dateTo = '', hidden = false) {
         let query = `${API_URL}?search=${encodeURIComponent(search)}&sort=${sort}&page=${page}&limit=${limit}&tag=${encodeURIComponent(tag)}`;
@@ -197,25 +205,31 @@ export const api = {
     },
 
     getThumbnailUrl(filename) {
-        return `${API_URL.replace('/api/videos', '')}/api/thumbnails/${encodeURIComponent(filename)}`;
+        const token = getAuthToken();
+        const base = `${API_URL.replace('/api/videos', '')}/api/thumbnails/${encodeURIComponent(filename)}`;
+        return token ? `${base}?token=${token}` : base;
     },
 
     async generateThumbnail(filename) {
         const res = await fetch(`${API_URL.replace('/api/videos', '')}/api/thumbnails/${encodeURIComponent(filename)}`, { method: 'POST' });
-        return await res.json();
+        return res.json();
     },
 
     async generatePreview(filename) {
         const res = await fetch(`${API_URL.replace('/api/videos', '')}/api/thumbnails/${encodeURIComponent(filename)}/preview`, { method: 'POST' });
-        return await res.json();
+        return res.json();
     },
 
     getPreviewUrl(filename) {
-        return `${API_URL.replace('/api/videos', '')}/api/thumbnails/${encodeURIComponent(filename)}/preview`;
+        const token = getAuthToken();
+        const base = `${API_URL.replace('/api/videos', '')}/api/thumbnails/${encodeURIComponent(filename)}/preview`;
+        return token ? `${base}?token=${token}` : base;
     },
 
     getStreamUrl(filename) {
-        return `${API_URL}/${filename}/stream`;
+        const token = getAuthToken();
+        const base = `${API_URL}/${filename}/stream`;
+        return token ? `${base}?token=${token}` : base;
     },
 
     async getAssetDetails(filename) {
