@@ -47,7 +47,8 @@ module.exports = (io) => {
             socket.emit('tagging-status', { isTagging: true });
 
             const { model } = data || {};
-            const modelName = model || getOllamaSettings().tagModel || 'llama3';
+            const settings = await getOllamaSettings();
+            const modelName = model || settings.tagModel || 'llama3';
 
             console.log(`Starting auto-tagging with model: ${modelName}`);
             socket.emit('tagging-log', { message: `Starting...`, type: 'info' });
@@ -72,7 +73,7 @@ module.exports = (io) => {
                         break;
                     }
 
-                    const meta = store.get(video);
+                    const meta = await store.get(video);
                     if (meta.tags && meta.tags.length > 0) {
                         continue;
                     }
@@ -94,7 +95,7 @@ module.exports = (io) => {
                         const tags = rawTags.filter(t => t.length < 30);
 
                         if (tags.length > 0) {
-                            store.update(video, { tags: tags });
+                            await store.update(video, { tags: tags });
                             socket.emit('tagging-log', { message: `Tagged: ${tags.join(', ')}`, type: 'success' });
                         } else {
                             socket.emit('tagging-log', { message: `No tags generated.`, type: 'warning' });

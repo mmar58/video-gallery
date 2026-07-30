@@ -1,102 +1,113 @@
-const fs = require('fs');
-const path = require('path');
-
-const config = require('../config');
-
-const DATA_FILE = path.join(config.dataDir, 'metadata.json');
-
-// Ensure data directory exists
-const dataDir = path.dirname(DATA_FILE);
-if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true });
-}
-
-// Load data
-let metadata = {};
-try {
-    if (fs.existsSync(DATA_FILE)) {
-        metadata = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
-    }
-} catch (err) {
-    console.error('Error reading metadata:', err);
-    metadata = {};
-}
-
-function save() {
-    try {
-        fs.writeFileSync(DATA_FILE, JSON.stringify(metadata, null, 2));
-    } catch (err) {
-        console.error('Error saving metadata:', err);
-    }
-}
+const db = require('./db');
 
 module.exports = {
-    getAll: () => metadata,
-    get: (filename) => metadata[filename] || { likes: 0, tags: [] },
-
-    add: (filename) => {
-        if (!metadata[filename]) {
-            metadata[filename] = { likes: 0, tags: [] };
-            save();
+    getAll: async () => {
+        const videos = await db('videos').select('*');
+        const videoTags = await db('video_tags')
+            .join('tags', 'video_tags.tag_id', 'tags.id')
+            .select('video_tags.video_id', 'tags.name');
+        
+        const metadata = {};
+        for (const v of videos) {
+            metadata[v.filename] = { likes: v.likes, tags: [] };
         }
-        return metadata[filename];
-    },
-
-    update: (filename, updates) => {
-        const current = metadata[filename] || { likes: 0, tags: [] };
-        metadata[filename] = { ...current, ...updates };
-        save();
-        return metadata[filename];
-    },
-
-    rename: (oldName, newName) => {
-        if (metadata[oldName]) {
-            metadata[newName] = metadata[oldName];
-            delete metadata[oldName];
-            save();
-        }
-    },
-
-    delete: (filename) => {
-        if (metadata[filename]) {
-            delete metadata[filename];
-            save();
-        }
-    },
-
-    removeTagFromAll: (tagToRemove) => {
-        let modified = false;
-        const lowerTag = tagToRemove.toLowerCase();
-
-        Object.keys(metadata).forEach(filename => {
-            const entry = metadata[filename];
-            if (entry.tags && entry.tags.length > 0) {
-                const initialLength = entry.tags.length;
-                entry.tags = entry.tags.filter(t => t.toLowerCase() !== lowerTag);
-                if (entry.tags.length !== initialLength) modified = true;
+        for (const vt of videoTags) {
+            const v = videos.find(v => v.id === vt.video_id);
+            if (v && metadata[v.filename]) {
+                metadata[v.filename].tags.push(vt.name);
             }
-        });
-
-        if (modified) save();
+        }
+        return metadata;
     },
 
-    renameTagInAll: (oldTag, newTag) => {
-        let modified = false;
-        const lowerOld = oldTag.toLowerCase();
+    get: async (filename) => {
+        const video = await db('videos').where({ filename }).first();
+        if (!video) return { likes: 0, tags: [] };
 
-        Object.keys(metadata).forEach(filename => {
-            const entry = metadata[filename];
-            if (entry.tags) {
-                const index = entry.tags.findIndex(t => t.toLowerCase() === lowerOld);
-                if (index !== -1) {
-                    entry.tags[index] = newTag;
-                    // Remove duplicates if newTag already existed
-                    entry.tags = [...new Set(entry.tags)];
-                    modified = true;
+        const tags = await db('video_tags')
+            .join('tags', 'video_tags.tag_id', 'tags.id')
+            .where('video_tags.video_id', video.id)
+            .select('tags.name');
+
+        return { likes: video.likes, tags: tags.map(t => t.name) };
+    },
+
+    add: async (filename) => {
+        let video = await db('videos').where({ filename }).first();
+        if (!video) {
+            const [newVideo] = await db('videos').insert({ filename, likes: 0 }).returning('*');
+            video = newVideo;
+        }
+        return { likes: video.likes, tags: [] };
+    },
+
+    update: async (filename, updates) => {
+        let video = await db('videos').where({ filename }).first();
+        if (!video) {
+            const [newVideo] = await db('videos').insert({ filename, likes: 0 }).returning('*');
+            video = newVideo;
+        }
+
+        if (updates.likes !== undefined) {
+            await db('videos').where({ id: video.id }).update({ likes: updates.likes });
+            video.likes = updates.likes;
+        }
+
+        if (updates.tags !== undefined) {
+            // Delete old tags
+            await db('video_tags').where({ video_id: video.id }).delete();
+            
+            // Insert new tags
+            for (const tagName of updates.tags) {
+                let tag = await db('tags').whereRaw('LOWER(name) = ?', [tagName.toLowerCase()]).first();
+                if (!tag) {
+                    const [newTag] = await db('tags').insert({ name: tagName }).returning('*');
+                    tag = newTag;
                 }
+                await db('video_tags').insert({ video_id: video.id, tag_id: tag.id }).onConflict(['video_id', 'tag_id']).ignore();
             }
-        });
+        }
 
-        if (modified) save();
+        const tags = await db('video_tags')
+            .join('tags', 'video_tags.tag_id', 'tags.id')
+            .where('video_tags.video_id', video.id)
+            .select('tags.name');
+
+        return { likes: video.likes, tags: tags.map(t => t.name) };
+    },
+
+    rename: async (oldName, newName) => {
+        await db('videos').where({ filename: oldName }).update({ filename: newName });
+    },
+
+    delete: async (filename) => {
+        await db('videos').where({ filename }).delete();
+    },
+
+    removeTagFromAll: async (tagToRemove) => {
+        const lowerTag = tagToRemove.toLowerCase();
+        const tag = await db('tags').whereRaw('LOWER(name) = ?', [lowerTag]).first();
+        if (tag) {
+            await db('tags').where({ id: tag.id }).delete();
+        }
+    },
+
+    renameTagInAll: async (oldTag, newTag) => {
+        const lowerOld = oldTag.toLowerCase();
+        const tag = await db('tags').whereRaw('LOWER(name) = ?', [lowerOld]).first();
+        
+        if (tag) {
+            // Check if newTag already exists
+            const existingNew = await db('tags').whereRaw('LOWER(name) = ?', [newTag.toLowerCase()]).first();
+            if (existingNew) {
+                // Update video_tags to point to existingNew, then delete old tag
+                await db('video_tags').where({ tag_id: tag.id }).update({ tag_id: existingNew.id }).onConflict(['video_id', 'tag_id']).ignore();
+                // some might have been ignored (already had the new tag), so just delete old video_tags
+                await db('video_tags').where({ tag_id: tag.id }).delete();
+                await db('tags').where({ id: tag.id }).delete();
+            } else {
+                await db('tags').where({ id: tag.id }).update({ name: newTag });
+            }
+        }
     }
 };

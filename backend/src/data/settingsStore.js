@@ -1,19 +1,10 @@
-const fs = require('fs');
-const path = require('path');
+const db = require('./db');
 
-const config = require('../config');
-
-const SETTINGS_FILE = path.join(config.dataDir, 'settings.json');
 const DEFAULT_SETTINGS = {
     ollama: {
         tagModel: 'llama3'
     }
 };
-
-const dataDir = path.dirname(SETTINGS_FILE);
-if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true });
-}
 
 function normalizeSettings(settings = {}) {
     return {
@@ -26,25 +17,27 @@ function normalizeSettings(settings = {}) {
     };
 }
 
-function readSettings() {
+async function readSettings() {
     try {
-        if (!fs.existsSync(SETTINGS_FILE)) {
+        const row = await db('settings').where({ key: 'global' }).first();
+        if (!row) {
             return normalizeSettings();
         }
-
-        const raw = fs.readFileSync(SETTINGS_FILE, 'utf8');
-        return normalizeSettings(JSON.parse(raw));
+        return normalizeSettings(row.value);
     } catch (error) {
         console.error('Error reading settings:', error);
         return normalizeSettings();
     }
 }
 
-function writeSettings(settings) {
+async function writeSettings(settings) {
     const normalized = normalizeSettings(settings);
 
     try {
-        fs.writeFileSync(SETTINGS_FILE, JSON.stringify(normalized, null, 2));
+        await db('settings')
+            .insert({ key: 'global', value: JSON.stringify(normalized) })
+            .onConflict('key')
+            .merge();
     } catch (error) {
         console.error('Error saving settings:', error);
     }
@@ -52,23 +45,25 @@ function writeSettings(settings) {
     return normalized;
 }
 
-function getSettings() {
-    return readSettings();
+async function getSettings() {
+    return await readSettings();
 }
 
-function getOllamaSettings() {
-    return readSettings().ollama;
+async function getOllamaSettings() {
+    const settings = await readSettings();
+    return settings.ollama;
 }
 
-function updateOllamaSettings(updates = {}) {
-    const settings = readSettings();
+async function updateOllamaSettings(updates = {}) {
+    const settings = await readSettings();
 
     settings.ollama = {
         ...settings.ollama,
         ...updates
     };
 
-    return writeSettings(settings).ollama;
+    const newSettings = await writeSettings(settings);
+    return newSettings.ollama;
 }
 
 module.exports = {

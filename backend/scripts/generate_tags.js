@@ -11,7 +11,7 @@ const BLACKLIST_FILE = path.join(__dirname, '../src/data/blacklist.json');
 const args = process.argv.slice(2);
 const force = args.includes('--force');
 const modelArg = args.find(a => a.startsWith('--model='));
-const defaultModel = getOllamaSettings().tagModel || 'llama3';
+// defaultModel resolved in async main
 const model = modelArg ? modelArg.split('=')[1] : defaultModel;
 
 function getBlacklist() {
@@ -22,6 +22,10 @@ function getBlacklist() {
 }
 
 async function main() {
+    if (!model) {
+        const settings = await getOllamaSettings();
+        model = settings.tagModel || 'llama3';
+    }
     console.log(`Starting Auto-Tagging with model: ${model}...`);
     if (force) console.log('Force mode enabled: Retagging all videos.');
 
@@ -42,7 +46,7 @@ async function main() {
     const abortController = new AbortController(); // Not really used for aborting here, but service expects signal
 
     for (const [index, video] of videos.entries()) {
-        const meta = store.get(video);
+        const meta = await store.get(video);
 
         // Skip if already tagged and not forced
         if (!force && meta.tags && meta.tags.length > 0) {
@@ -63,7 +67,7 @@ async function main() {
             const tags = rawTags.filter(t => t.length < 30);
 
             if (tags.length > 0) {
-                store.update(video, { tags: tags });
+                await store.update(video, { tags: tags });
                 console.log(`Tags: ${tags.join(', ')}`);
             } else {
                 console.log('No tags generated.');

@@ -26,10 +26,10 @@ const cleanStorage = async () => {
 
         // 2. Clean Database (Metadata Store)
         let storeCleanCount = 0;
-        const allMetadata = store.getAll();
+        const allMetadata = await store.getAll();
         for (const filename of Object.keys(allMetadata)) {
             if (!validVideos.has(filename)) {
-                store.delete(filename);
+                await store.delete(filename);
                 storeCleanCount++;
             }
         }

@@ -24,9 +24,9 @@ const saveBlacklist = (list) => {
 };
 
 // GET /api/tags - Get all tags with counts
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
     try {
-        const metadata = store.getAll();
+        const metadata = await store.getAll();
         const tagCounts = {};
 
         Object.values(metadata).forEach(entry => {
@@ -53,7 +53,7 @@ router.get('/', (req, res) => {
 });
 
 // PUT /api/tags/:tag - Rename tag
-router.put('/:tag', (req, res) => {
+router.put('/:tag', async (req, res) => {
     try {
         const oldTag = req.params.tag; // Explicitly decoded by express? No, params are decoded.
         // If tag has spaces/special chars, client should encodeURI. Express decodes it.
@@ -61,7 +61,7 @@ router.put('/:tag', (req, res) => {
 
         if (!newName) return res.status(400).json({ error: 'New name required' });
 
-        store.renameTagInAll(oldTag, newName);
+        await store.renameTagInAll(oldTag, newName);
         res.json({ success: true });
     } catch (err) {
         console.error(err);
@@ -70,10 +70,10 @@ router.put('/:tag', (req, res) => {
 });
 
 // DELETE /api/tags/:tag - Delete tag globally
-router.delete('/:tag', (req, res) => {
+router.delete('/:tag', async (req, res) => {
     try {
         const tag = req.params.tag;
-        store.removeTagFromAll(tag);
+        await store.removeTagFromAll(tag);
         res.json({ success: true });
     } catch (err) {
         console.error(err);
@@ -82,7 +82,7 @@ router.delete('/:tag', (req, res) => {
 });
 
 // POST /api/tags/:tag/blacklist - Add to blacklist AND delete globally
-router.post('/:tag/blacklist', (req, res) => {
+router.post('/:tag/blacklist', async (req, res) => {
     try {
         const tag = req.params.tag;
 
@@ -95,7 +95,7 @@ router.post('/:tag/blacklist', (req, res) => {
         }
 
         // 2. Remove from all videos
-        store.removeTagFromAll(tag);
+        await store.removeTagFromAll(tag);
 
         res.json({ success: true });
     } catch (err) {

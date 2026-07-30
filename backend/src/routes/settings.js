@@ -29,18 +29,18 @@ router.get('/blacklist', (req, res) => {
     res.json(getBlacklist());
 });
 
-router.get('/ollama', (req, res) => {
-    res.json(getOllamaSettings());
+router.get('/ollama', async (req, res) => {
+    res.json(await getOllamaSettings());
 });
 
-router.put('/ollama', (req, res) => {
+router.put('/ollama', async (req, res) => {
     const { tagModel } = req.body || {};
 
     if (typeof tagModel !== 'string' || !tagModel.trim()) {
         return res.status(400).json({ error: 'tagModel is required' });
     }
 
-    const settings = updateOllamaSettings({ tagModel: tagModel.trim() });
+    const settings = await updateOllamaSettings({ tagModel: tagModel.trim() });
     res.json(settings);
 });
 
