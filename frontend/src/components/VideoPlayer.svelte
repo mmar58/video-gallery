@@ -12,6 +12,9 @@
   let isDragging = false;
   let startX, startY, startLeft, startTop;
 
+  let audioTracks = [];
+  let showTrackMenu = false;
+
   // Initial position (center-ish)
   let left = 20;
   let top = 20;
@@ -120,8 +123,54 @@
     dispatch("close");
   }
 
+  function handleTimeUpdate(e) {
+    if (videoEl) {
+      localStorage.setItem(`video-time-${video.name}`, videoEl.currentTime.toString());
+    }
+  }
+
+  function handleVolumeChange(e) {
+    if (videoEl) {
+      localStorage.setItem('video-volume', videoEl.volume.toString());
+      localStorage.setItem('video-muted', videoEl.muted.toString());
+    }
+  }
+
+  function selectAudioTrack(index) {
+    if (videoEl && videoEl.audioTracks) {
+      for (let i = 0; i < videoEl.audioTracks.length; i++) {
+        videoEl.audioTracks[i].enabled = (i === index);
+      }
+      showTrackMenu = false;
+    }
+  }
+
   function handleLoadedMetadata(e) {
     if (typeof window === "undefined") return;
+
+    // Restore time
+    const savedTime = localStorage.getItem(`video-time-${video.name}`);
+    if (savedTime && videoEl) {
+      videoEl.currentTime = parseFloat(savedTime);
+    }
+
+    // Restore volume
+    const savedVolume = localStorage.getItem('video-volume');
+    if (savedVolume !== null && videoEl) {
+      videoEl.volume = parseFloat(savedVolume);
+    }
+    const savedMuted = localStorage.getItem('video-muted');
+    if (savedMuted !== null && videoEl) {
+      videoEl.muted = savedMuted === 'true';
+    }
+
+    // Check for audio tracks
+    if (videoEl && videoEl.audioTracks && videoEl.audioTracks.length > 1) {
+      audioTracks = Array.from(videoEl.audioTracks);
+    } else {
+      audioTracks = [];
+    }
+
     const videoWidth = e.target.videoWidth;
     const videoHeight = e.target.videoHeight;
     
@@ -150,15 +199,39 @@
   <div
     class="drag-handle bg-gray-800 p-2 cursor-move flex justify-between items-center select-none shrink-0"
   >
-    <h3 class="text-white text-sm font-medium truncate px-2 max-w-[80%]">
+    <h3 class="text-white text-sm font-medium truncate px-2 max-w-[60%]">
       {video.name}
     </h3>
-    <button
-      on:click|stopPropagation={close}
-      class="text-gray-400 hover:text-white px-2 text-lg leading-none"
-    >
-      &times;
-    </button>
+    <div class="flex items-center gap-2">
+      {#if audioTracks.length > 1}
+        <div class="relative">
+          <button
+            on:click|stopPropagation={() => showTrackMenu = !showTrackMenu}
+            class="text-xs bg-gray-700 hover:bg-gray-600 text-white px-2 py-1 rounded transition"
+          >
+            Audio Tracks
+          </button>
+          {#if showTrackMenu}
+            <div class="absolute right-0 top-full mt-1 bg-gray-800 border border-gray-700 rounded shadow-lg z-50 min-w-[120px] overflow-hidden">
+              {#each audioTracks as track, i}
+                <button
+                  on:click|stopPropagation={() => selectAudioTrack(i)}
+                  class="w-full text-left px-3 py-2 text-xs text-white hover:bg-gray-700 transition {track.enabled ? 'bg-blue-600 hover:bg-blue-500' : ''}"
+                >
+                  {track.language || track.label || `Track ${i + 1}`}
+                </button>
+              {/each}
+            </div>
+          {/if}
+        </div>
+      {/if}
+      <button
+        on:click|stopPropagation={close}
+        class="text-gray-400 hover:text-white px-2 text-lg leading-none"
+      >
+        &times;
+      </button>
+    </div>
   </div>
 
   <!-- Content -->
@@ -172,6 +245,8 @@
       controls
       autoplay
       on:loadedmetadata={handleLoadedMetadata}
+      on:timeupdate={handleTimeUpdate}
+      on:volumechange={handleVolumeChange}
     ></video>
   </div>
 </div>
