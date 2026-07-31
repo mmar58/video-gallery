@@ -1,18 +1,18 @@
-<script>
+<script lang="ts">
   import { createEventDispatcher, onMount } from "svelte";
   import { api } from "../lib/api";
 
-  export let video;
-  export let zIndex = 100;
+  export let video: any;
+  export let zIndex: number = 100;
 
   const dispatch = createEventDispatcher();
-  let videoEl;
-  let containerEl;
+  let videoEl: HTMLVideoElement;
+  let containerEl: HTMLDivElement;
 
   let isDragging = false;
-  let startX, startY, startLeft, startTop;
+  let startX: number, startY: number, startLeft: number, startTop: number;
 
-  let audioTracks = [];
+  let audioTracks: any[] = [];
   let showTrackMenu = false;
 
   // Initial position (center-ish)
@@ -44,7 +44,7 @@
     }
   });
 
-  function handleStart(clientX, clientY) {
+  function handleStart(clientX: number, clientY: number) {
     isDragging = true;
     startX = clientX;
     startY = clientY;
@@ -53,7 +53,7 @@
     dispatch("focus");
   }
 
-  function handleMove(clientX, clientY) {
+  function handleMove(clientX: number, clientY: number) {
     if (!isDragging) return;
     const dx = clientX - startX;
     const dy = clientY - startY;
@@ -71,8 +71,8 @@
   }
 
   // Mouse Events
-  function handleMouseDown(e) {
-    if (e.target.closest(".drag-handle")) {
+  function handleMouseDown(e: MouseEvent) {
+    if ((e.target as HTMLElement).closest(".drag-handle")) {
       handleStart(e.clientX, e.clientY);
       window.addEventListener("mousemove", handleMouseMoveWindow);
       window.addEventListener("mouseup", handleMouseUpWindow);
@@ -81,7 +81,7 @@
     }
   }
 
-  function handleMouseMoveWindow(e) {
+  function handleMouseMoveWindow(e: MouseEvent) {
     handleMove(e.clientX, e.clientY);
   }
 
@@ -92,8 +92,8 @@
   }
 
   // Touch Events (Mobile)
-  function handleTouchStart(e) {
-    if (e.target.closest(".drag-handle")) {
+  function handleTouchStart(e: TouchEvent) {
+    if ((e.target as HTMLElement).closest(".drag-handle")) {
       // e.preventDefault(); // Might block scrolling, careful. But we want to drag.
       const touch = e.touches[0];
       handleStart(touch.clientX, touch.clientY);
@@ -106,7 +106,7 @@
     }
   }
 
-  function handleTouchMoveWindow(e) {
+  function handleTouchMoveWindow(e: TouchEvent) {
     if (!isDragging) return;
     e.preventDefault(); // Prevent scrolling while dragging
     const touch = e.touches[0];
@@ -123,29 +123,30 @@
     dispatch("close");
   }
 
-  function handleTimeUpdate(e) {
+  function handleTimeUpdate(e: Event) {
     if (videoEl) {
       localStorage.setItem(`video-time-${video.name}`, videoEl.currentTime.toString());
     }
   }
 
-  function handleVolumeChange(e) {
+  function handleVolumeChange(e: Event) {
     if (videoEl) {
       localStorage.setItem('video-volume', videoEl.volume.toString());
       localStorage.setItem('video-muted', videoEl.muted.toString());
     }
   }
 
-  function selectAudioTrack(index) {
-    if (videoEl && videoEl.audioTracks) {
-      for (let i = 0; i < videoEl.audioTracks.length; i++) {
-        videoEl.audioTracks[i].enabled = (i === index);
+  function selectAudioTrack(index: number) {
+    if (videoEl && (videoEl as any).audioTracks) {
+      const tracks = (videoEl as any).audioTracks;
+      for (let i = 0; i < tracks.length; i++) {
+        tracks[i].enabled = (i === index);
       }
       showTrackMenu = false;
     }
   }
 
-  function handleLoadedMetadata(e) {
+  function handleLoadedMetadata(e: Event) {
     if (typeof window === "undefined") return;
 
     // Restore time
@@ -165,14 +166,15 @@
     }
 
     // Check for audio tracks
-    if (videoEl && videoEl.audioTracks && videoEl.audioTracks.length > 1) {
-      audioTracks = Array.from(videoEl.audioTracks);
+    if (videoEl && (videoEl as any).audioTracks && (videoEl as any).audioTracks.length > 1) {
+      audioTracks = Array.from((videoEl as any).audioTracks);
     } else {
       audioTracks = [];
     }
 
-    const videoWidth = e.target.videoWidth;
-    const videoHeight = e.target.videoHeight;
+    const target = e.target as HTMLVideoElement;
+    const videoWidth = target.videoWidth;
+    const videoHeight = target.videoHeight;
     
     if (videoHeight > videoWidth) {
       const vh = window.innerHeight;
