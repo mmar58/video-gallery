@@ -189,7 +189,7 @@ router.get('/stats', async (req: AuthRequest, res) => {
 
 // GET /api/videos/:filename/stream
 router.get('/:filename/stream', async (req: AuthRequest, res) => {
-    const { dirId, filename } = parseFilename(req.params.filename);
+    const { dirId, filename } = parseFilename(req.params.filename as string);
     if (!dirId) return res.status(400).send('Invalid filename format');
     
     const dirPath = await getDirectoryPath(dirId, req.user.id, req.user.is_admin);
@@ -257,7 +257,7 @@ router.post('/:filename/hide', async (req, res) => {
 });
 
 router.put('/:filename', async (req: AuthRequest, res) => {
-    const { dirId, filename: oldName } = parseFilename(req.params.filename);
+    const { dirId, filename: oldName } = parseFilename(req.params.filename as string);
     const newName = req.body.newName;
     
     if (!dirId || !newName) return res.status(400).json({ error: 'Invalid input' });
@@ -281,7 +281,7 @@ router.put('/:filename', async (req: AuthRequest, res) => {
 const { deleteThumbnail } = require('../services/thumbnailService');
 
 router.delete('/:filename', async (req: AuthRequest, res) => {
-    const { dirId, filename } = parseFilename(req.params.filename);
+    const { dirId, filename } = parseFilename(req.params.filename as string);
     if (!dirId) return res.status(400).json({ error: 'Invalid input' });
     
     const dirPath = await getDirectoryPath(dirId, req.user.id, req.user.is_admin);
@@ -293,7 +293,7 @@ router.delete('/:filename', async (req: AuthRequest, res) => {
     fs.unlink(filePath, (err) => {
         if (err) return res.status(500).json({ error: 'Delete failed' });
         store.delete(filename);
-        deleteThumbnail(req.params.filename); // passing full name as thumbnail service uses it? We'll have to adapt thumbnailService
+        deleteThumbnail(req.params.filename as string); // passing full name as thumbnail service uses it? We'll have to adapt thumbnailService
         res.json({ success: true });
     });
 });

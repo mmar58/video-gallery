@@ -19,6 +19,10 @@
     let error = "";
     let dirError = "";
 
+    let endpoints = [];
+    let newEndpointUrl = "";
+    let newEndpointWeight = 1;
+
     async function load() {
         console.log("[settings-debug] modal: load() start");
         loading = true;
@@ -42,6 +46,8 @@
 
             const availableNames = models.map((model) => model.name);
             const savedModel = settings?.tagModel || "";
+            
+            endpoints = settings?.endpoints || [{ id: 'default', url: 'http://127.0.0.1:11434', weight: 1, active: true }];
 
             selectedTagModel = availableNames.includes(savedModel)
                 ? savedModel
@@ -85,7 +91,7 @@
         error = "";
 
         try {
-            await api.saveOllamaSettings({ tagModel: selectedTagModel });
+            await api.saveOllamaSettings({ tagModel: selectedTagModel, endpoints });
             console.log("[settings-debug] modal: save() success");
             close();
         } catch (err) {
@@ -125,6 +131,22 @@
         } finally {
             dirLoading = false;
         }
+    }
+
+    function handleAddEndpoint() {
+        if (!newEndpointUrl) return;
+        endpoints = [...endpoints, {
+            id: 'ep_' + Date.now(),
+            url: newEndpointUrl,
+            weight: newEndpointWeight || 1,
+            active: true
+        }];
+        newEndpointUrl = "";
+        newEndpointWeight = 1;
+    }
+
+    function handleRemoveEndpoint(id) {
+        endpoints = endpoints.filter(ep => ep.id !== id);
     }
 </script>
 
@@ -183,6 +205,52 @@
                                 No Ollama models were returned. Make sure Ollama is running and models are installed.
                             </div>
                         {/if}
+                    </div>
+
+                    <div class="pt-5 border-t border-gray-800 space-y-3">
+                        <h3 class="text-md font-semibold text-white mb-2">Ollama Endpoints</h3>
+                        <p class="text-xs text-gray-400 mb-3">Add multiple Ollama URLs for load balancing. Weight determines concurrency limit.</p>
+                        
+                        {#each endpoints as ep (ep.id)}
+                            <div class="flex items-center justify-between p-3 rounded-lg border border-gray-700 bg-gray-900/50">
+                                <div class="flex-1 overflow-hidden mr-3">
+                                    <div class="text-sm font-medium text-gray-200 truncate" title={ep.url}>{ep.url}</div>
+                                    <div class="text-xs text-gray-500">Weight (Concurrency): {ep.weight}</div>
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <label class="flex items-center cursor-pointer gap-2">
+                                        <span class="text-xs text-gray-400">{ep.active ? 'Active' : 'Disabled'}</span>
+                                        <input type="checkbox" bind:checked={ep.active} class="rounded border-gray-700 bg-gray-950 text-cyan-500 focus:ring-cyan-500" />
+                                    </label>
+                                    <button 
+                                        onclick={() => handleRemoveEndpoint(ep.id)}
+                                        class="p-2 text-red-400 hover:text-red-300 hover:bg-red-400/10 rounded transition"
+                                    >
+                                        <Trash2 size={16} />
+                                    </button>
+                                </div>
+                            </div>
+                        {/each}
+
+                        <div class="mt-3 p-3 rounded-xl border border-gray-700 bg-gray-800/30">
+                            <div class="flex gap-2 items-end">
+                                <div class="flex-1">
+                                    <label class="block text-xs font-medium text-gray-400 mb-1">Ollama URL</label>
+                                    <input type="text" bind:value={newEndpointUrl} placeholder="http://192.168.1.5:11434" class="w-full rounded-lg border border-gray-700 bg-gray-950 px-3 py-2 text-white text-sm focus:border-cyan-400 focus:outline-none" />
+                                </div>
+                                <div class="w-20">
+                                    <label class="block text-xs font-medium text-gray-400 mb-1">Weight</label>
+                                    <input type="number" bind:value={newEndpointWeight} min="1" class="w-full rounded-lg border border-gray-700 bg-gray-950 px-3 py-2 text-white text-sm focus:border-cyan-400 focus:outline-none" />
+                                </div>
+                                <button
+                                    onclick={handleAddEndpoint}
+                                    disabled={!newEndpointUrl}
+                                    class="rounded-lg bg-gray-700 px-3 py-2 text-sm font-medium text-white transition hover:bg-gray-600 disabled:opacity-50"
+                                >
+                                    Add
+                                </button>
+                            </div>
+                        </div>
                     </div>
 
                     {#if error}

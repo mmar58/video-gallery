@@ -2,13 +2,25 @@ import { writable } from 'svelte/store';
 import { api } from '$lib/api';
 import { SOCKET_URL } from '$lib/socket';
 
-export const authStore = writable({
+export interface User {
+    username: string;
+    // add other fields if known, or leave as any
+    [key: string]: any;
+}
+
+export interface AuthState {
+    isAuthenticated: boolean;
+    user: User | null;
+    loading: boolean;
+}
+
+export const authStore = writable<AuthState>({
     isAuthenticated: false,
     user: null,
     loading: true
 });
 
-export const initAuth = async () => {
+export const initAuth = async (): Promise<void> => {
     const token = typeof localStorage !== 'undefined' ? localStorage.getItem('token') : null;
     if (token) {
         try {
@@ -31,7 +43,7 @@ export const initAuth = async () => {
     }
 };
 
-export const login = async (username, password) => {
+export const login = async (username: string, password: string): Promise<{ success: boolean; error?: string }> => {
     const res = await fetch(`${SOCKET_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -46,7 +58,7 @@ export const login = async (username, password) => {
     return { success: false, error: data.error };
 };
 
-export const register = async (username, password) => {
+export const register = async (username: string, password: string): Promise<{ success: boolean; error?: string }> => {
     const res = await fetch(`${SOCKET_URL}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -59,7 +71,7 @@ export const register = async (username, password) => {
     return { success: false, error: data.error };
 };
 
-export const logout = () => {
+export const logout = (): void => {
     localStorage.removeItem('token');
     authStore.set({ isAuthenticated: false, user: null, loading: false });
 };

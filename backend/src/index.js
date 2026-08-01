@@ -25,7 +25,9 @@ const loadFrontendHandler = async () => {
         return null;
     }
 
-    const frontendModule = await import(pathToFileURL(frontendHandlerPath).href);
+    // Use a dynamic import wrapped in new Function to prevent TypeScript from transpiling it to require()
+    const dynamicImport = new Function('modulePath', 'return import(modulePath)');
+    const frontendModule = await dynamicImport(pathToFileURL(frontendHandlerPath).href);
     return frontendModule.handler || null;
 };
 

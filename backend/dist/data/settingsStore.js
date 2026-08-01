@@ -2,7 +2,10 @@
 const db = require('./db');
 const DEFAULT_SETTINGS = {
     ollama: {
-        tagModel: 'llama3'
+        tagModel: 'llama3',
+        endpoints: [
+            { id: 'default', url: 'http://127.0.0.1:11434', weight: 1, active: true }
+        ]
     }
 };
 function normalizeSettings(settings = {}) {
@@ -11,7 +14,8 @@ function normalizeSettings(settings = {}) {
         ...settings,
         ollama: {
             ...DEFAULT_SETTINGS.ollama,
-            ...(settings.ollama || {})
+            ...(settings.ollama || {}),
+            endpoints: (settings.ollama && settings.ollama.endpoints) || DEFAULT_SETTINGS.ollama.endpoints
         }
     };
 }

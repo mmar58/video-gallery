@@ -29,12 +29,19 @@ router.get('/blacklist', (req, res) => {
 router.get('/ollama', async (req, res) => {
     res.json(await getOllamaSettings());
 });
+const { getModels, refreshPool } = require('../services/ollamaService');
 router.put('/ollama', async (req, res) => {
-    const { tagModel } = req.body || {};
+    const { tagModel, endpoints } = req.body || {};
     if (typeof tagModel !== 'string' || !tagModel.trim()) {
         return res.status(400).json({ error: 'tagModel is required' });
     }
-    const settings = await updateOllamaSettings({ tagModel: tagModel.trim() });
+    const updates = { tagModel: tagModel.trim() };
+    if (Array.isArray(endpoints)) {
+        updates.endpoints = endpoints;
+    }
+    const settings = await updateOllamaSettings(updates);
+    // Refresh the ollama service pool with the new endpoints
+    refreshPool();
     res.json(settings);
 });
 // POST /api/settings/blacklist - Add a word
