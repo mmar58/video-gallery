@@ -21,6 +21,8 @@
 
     export let video: any; // Ideally define a proper Video interface
     export let hoverMode = "player"; // 'player' | 'preview'
+    export let selectionMode = false;
+    export let isSelected = false;
 
     const dispatch = createEventDispatcher();
     let videoRef: HTMLVideoElement;
@@ -69,6 +71,11 @@
         if (confirm(`Delete ${video.name}?`)) {
             videoStore.remove(video.name);
         }
+    }
+
+    function handleCheckboxClick(e: Event) {
+        e.stopPropagation();
+        dispatch("select", video);
     }
 
     function handleRename(e: Event) {
@@ -208,7 +215,8 @@
     on:mouseenter={handleMouseEnter}
     on:mouseleave={handleMouseLeave}
     on:mousemove={handleMouseMove}
-    on:click={() => dispatch("play", video)}
+    on:click={() => selectionMode ? dispatch('select', video) : dispatch('play', video)}
+    style={isSelected ? 'outline: 2px solid #ef4444; outline-offset: 2px; box-shadow: 0 0 0 4px rgba(239,68,68,0.15);' : ''}
 >
     <!-- Video Preview / Thumbnail -->
     <div class="aspect-video bg-black relative overflow-hidden">
@@ -268,6 +276,36 @@
             >
                 <Play size={48} class="text-white fill-white" />
             </div>
+        {/if}
+
+        <!-- Selection Checkbox -->
+        {#if selectionMode}
+            <!-- svelte-ignore a11y-click-events-have-key-events -->
+            <div
+                class="absolute top-2 left-2 z-20"
+                on:click={handleCheckboxClick}
+            >
+                <div
+                    class="w-6 h-6 rounded-md flex items-center justify-center transition-all"
+                    style="
+                        background: {isSelected ? '#ef4444' : 'rgba(0,0,0,0.6)'};
+                        border: 2px solid {isSelected ? '#ef4444' : 'rgba(255,255,255,0.5)'};
+                        backdrop-filter: blur(4px);
+                        box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+                    "
+                >
+                    {#if isSelected}
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                            <path d="M2 6l3 3 5-5" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    {/if}
+                </div>
+            </div>
+        {/if}
+
+        <!-- Selected Overlay Tint -->
+        {#if isSelected}
+            <div class="absolute inset-0 z-10 pointer-events-none" style="background: rgba(239,68,68,0.12);"></div>
         {/if}
 
         <!-- Actions Overlay -->
