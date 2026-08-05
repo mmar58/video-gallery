@@ -63,8 +63,10 @@ router.get('/', async (req: AuthRequest, res) => {
                     return {
                         name: `${dir.id}::${file}`,
                         displayName: file, // Added for frontend UI
+                        path: filePath,
                         size: stats.size,
                         created: stats.birthtime,
+                        updated: stats.mtime,
                         likes: meta.likes,
                         tags: meta.tags,
                         hideUntil: (meta as any).hideUntil // typing workaround

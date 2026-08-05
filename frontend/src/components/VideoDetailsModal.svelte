@@ -328,8 +328,19 @@
                             class="text-sm text-gray-400 mt-1 flex items-center gap-2"
                         >
                             <Calendar size={14} />
-                            {formatDate(video.created)}
+                            Created: {formatDate(video.created)}
                         </p>
+                        {#if video.updated}
+                            <p class="text-sm text-gray-400 mt-1 flex items-center gap-2">
+                                <Calendar size={14} />
+                                Updated: {formatDate(video.updated)}
+                            </p>
+                        {/if}
+                        {#if video.path}
+                            <p class="text-xs text-gray-500 mt-2 break-all bg-gray-800/50 p-2 rounded border border-gray-700/50">
+                                <strong>Path:</strong> {video.path}
+                            </p>
+                        {/if}
                     </div>
                     <button
                         class="text-gray-500 hover:text-white"
