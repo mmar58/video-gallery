@@ -41,11 +41,11 @@ router.post('/register', async (req, res) => {
 // Login
 router.post('/login', async (req, res) => {
     try {
-        const { username, password } = req.body;
+        const { username, password, lowBandwidth } = req.body;
         if (!username || !password) {
             return res.status(400).json({ error: 'Username and password required' });
         }
-        const user = await (0, db_1.default)('users').where({ username }).first();
+        let user = await (0, db_1.default)('users').where({ username }).first();
         if (!user) {
             return res.status(401).json({ error: 'Invalid credentials' });
         }
@@ -53,7 +53,11 @@ router.post('/login', async (req, res) => {
         if (!isMatch) {
             return res.status(401).json({ error: 'Invalid credentials' });
         }
-        const token = jsonwebtoken_1.default.sign({ id: user.id, username: user.username, is_admin: user.is_admin, verified: user.verified }, JWT_SECRET, { expiresIn: '7d' });
+        if (lowBandwidth !== undefined && typeof lowBandwidth === 'boolean') {
+            await (0, db_1.default)('users').where({ id: user.id }).update({ low_bandwidth: lowBandwidth });
+            user.low_bandwidth = lowBandwidth;
+        }
+        const token = jsonwebtoken_1.default.sign({ id: user.id, username: user.username, is_admin: user.is_admin, verified: user.verified, low_bandwidth: user.low_bandwidth }, JWT_SECRET, { expiresIn: '7d' });
         res.json({
             message: 'Login successful',
             token,
@@ -61,7 +65,8 @@ router.post('/login', async (req, res) => {
                 id: user.id,
                 username: user.username,
                 is_admin: user.is_admin,
-                verified: user.verified
+                verified: user.verified,
+                low_bandwidth: user.low_bandwidth
             }
         });
     }
@@ -71,14 +76,46 @@ router.post('/login', async (req, res) => {
     }
 });
 // Get current user (Me)
-router.get('/me', auth_1.authenticateToken, (req, res) => {
+router.get('/me', auth_1.authenticateToken, async (req, res) => {
     if (!req.user)
         return res.status(401).json({ error: 'Not authenticated' });
+    // Fetch latest user data to ensure we have up to date preferences
+    const user = await (0, db_1.default)('users').where({ id: req.user.id }).first();
+    if (!user)
+        return res.status(404).json({ error: 'User not found' });
     res.json({
-        id: req.user.id,
-        username: req.user.username,
-        is_admin: req.user.is_admin,
-        verified: req.user.verified
+        id: user.id,
+        username: user.username,
+        is_admin: user.is_admin,
+        verified: user.verified,
+        low_bandwidth: user.low_bandwidth
     });
+});
+// Update current user settings
+router.put('/me/settings', auth_1.authenticateToken, async (req, res) => {
+    if (!req.user)
+        return res.status(401).json({ error: 'Not authenticated' });
+    const { lowBandwidth } = req.body;
+    try {
+        const updates = {};
+        if (lowBandwidth !== undefined && typeof lowBandwidth === 'boolean') {
+            updates.low_bandwidth = lowBandwidth;
+        }
+        if (Object.keys(updates).length > 0) {
+            await (0, db_1.default)('users').where({ id: req.user.id }).update(updates);
+        }
+        const user = await (0, db_1.default)('users').where({ id: req.user.id }).first();
+        res.json({
+            id: user.id,
+            username: user.username,
+            is_admin: user.is_admin,
+            verified: user.verified,
+            low_bandwidth: user.low_bandwidth
+        });
+    }
+    catch (error) {
+        console.error('Update settings error:', error);
+        res.status(500).json({ error: 'Failed to update settings' });
+    }
 });
 exports.default = router;

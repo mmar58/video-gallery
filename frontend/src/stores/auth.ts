@@ -4,6 +4,7 @@ import { SOCKET_URL } from '$lib/socket';
 
 export interface User {
     username: string;
+    low_bandwidth?: boolean;
     // add other fields if known, or leave as any
     [key: string]: any;
 }
@@ -43,16 +44,34 @@ export const initAuth = async (): Promise<void> => {
     }
 };
 
-export const login = async (username: string, password: string): Promise<{ success: boolean; error?: string }> => {
+export const login = async (username: string, password: string, lowBandwidth: boolean = false): Promise<{ success: boolean; error?: string }> => {
     const res = await fetch(`${SOCKET_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password })
+        body: JSON.stringify({ username, password, lowBandwidth })
     });
     const data = await res.json();
     if (res.ok) {
         localStorage.setItem('token', data.token);
         authStore.set({ isAuthenticated: true, user: data.user, loading: false });
+        return { success: true };
+    }
+    return { success: false, error: data.error };
+};
+
+export const updateSettings = async (lowBandwidth: boolean): Promise<{ success: boolean; error?: string }> => {
+    const token = localStorage.getItem('token');
+    const res = await fetch(`${SOCKET_URL}/api/auth/me/settings`, {
+        method: 'PUT',
+        headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ lowBandwidth })
+    });
+    const data = await res.json();
+    if (res.ok) {
+        authStore.update(state => ({ ...state, user: data }));
         return { success: true };
     }
     return { success: false, error: data.error };

@@ -60,6 +60,24 @@ export const api = {
         return data;
     },
 
+    async fetchGeneralSettings(): Promise<any> {
+        const baseUrl = API_URL.replace('/api/videos', '');
+        const res = await fetchWithAuth(`${baseUrl}/api/settings/general`);
+        if (!res.ok) throw new Error('Failed to fetch general settings');
+        return await res.json();
+    },
+
+    async saveGeneralSettings(settings: any): Promise<any> {
+        const baseUrl = API_URL.replace('/api/videos', '');
+        const res = await fetchWithAuth(`${baseUrl}/api/settings/general`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(settings)
+        });
+        if (!res.ok) throw new Error('Failed to save general settings');
+        return await res.json();
+    },
+
     async blacklistWord(word: string): Promise<any> {
         const res = await fetchWithAuth(`${API_URL.replace('/api/videos', '')}/api/settings/blacklist`, {
             method: "POST",

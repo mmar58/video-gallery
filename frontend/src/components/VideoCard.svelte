@@ -18,6 +18,7 @@
     } from "lucide-svelte";
     import { toast } from "../stores/toastStore";
     import { logStore } from "../stores/logStore";
+    import { authStore } from "../stores/auth";
 
     export let video: any; // Ideally define a proper Video interface
     export let hoverMode = "player"; // 'player' | 'preview'
@@ -46,6 +47,7 @@
                 }
             }, 200);
         } else if (hoverMode === "preview") {
+            if ($authStore.user?.low_bandwidth) return; // Disable automatic sprite loading
             checkPreview();
         }
     }
@@ -55,9 +57,13 @@
         clearTimeout(playTimeout);
 
         if (videoRef && !videoRef.paused) {
-            pauseTimeout = setTimeout(() => {
-                if (videoRef) videoRef.pause();
-            }, 8000);
+            if ($authStore.user?.low_bandwidth) {
+                videoRef.pause();
+            } else {
+                pauseTimeout = setTimeout(() => {
+                    if (videoRef) videoRef.pause();
+                }, 8000);
+            }
         }
     }
 
@@ -238,6 +244,7 @@
                 data-vid={video.name}
                 src={api.getThumbnailUrl(video.name)}
                 alt={video.name}
+                loading="lazy"
                 class="w-full h-full object-cover absolute inset-0 transition-opacity duration-300 {hasInteracted &&
                 !thumbnailError
                     ? 'opacity-0'
@@ -264,6 +271,7 @@
                 data-vid={video.name}
                 src={api.getThumbnailUrl(video.name)}
                 alt={video.name}
+                loading="lazy"
                 class="w-full h-full object-cover"
                 on:error={() => (thumbnailError = true)}
             />

@@ -3,7 +3,8 @@
     import { api } from "../lib/api";
     import { X, Settings2, Loader2, Save, FolderPlus, Trash2 } from "lucide-svelte";
     import { fade, fly } from "svelte/transition";
-    import { authStore } from "../stores/auth";
+    import { authStore, updateSettings } from "../stores/auth";
+    import { toast } from "../stores/toastStore";
 
     export let isOpen = false;
     export let onClose = () => {};
@@ -18,6 +19,8 @@
     let dirLoading = false;
     let error = "";
     let dirError = "";
+    
+    let lowBandwidth = false;
 
     let endpoints = [];
     let newEndpointUrl = "";
@@ -52,6 +55,9 @@
             selectedTagModel = availableNames.includes(savedModel)
                 ? savedModel
                 : availableNames[0] || savedModel;
+                
+            lowBandwidth = $authStore.user?.low_bandwidth || false;
+            
             console.log("[settings-debug] modal: load() success", {
                 savedModel,
                 modelCount: models.length,
@@ -92,6 +98,14 @@
 
         try {
             await api.saveOllamaSettings({ tagModel: selectedTagModel, endpoints });
+            
+            // Save low bandwidth user setting
+            const res = await updateSettings(lowBandwidth);
+            if (!res.success) {
+                console.error("Failed to update low bandwidth setting");
+                toast.error(res.error || "Failed to update user settings");
+            }
+            
             console.log("[settings-debug] modal: save() success");
             close();
         } catch (err) {
@@ -205,6 +219,20 @@
                                 No Ollama models were returned. Make sure Ollama is running and models are installed.
                             </div>
                         {/if}
+                    </div>
+                    
+                    <div class="pt-5 border-t border-gray-800 space-y-2">
+                        <h3 class="text-md font-semibold text-white mb-2">User Preferences</h3>
+                        <div class="flex items-center justify-between p-3 rounded-lg border border-gray-700 bg-gray-900/50">
+                            <div class="flex-1 mr-3">
+                                <div class="text-sm font-medium text-gray-200">Low Bandwidth Mode</div>
+                                <div class="text-xs text-gray-400">Play video only on hover without background preload, load less videos at once, and optimize for slower connections.</div>
+                            </div>
+                            <label class="flex items-center cursor-pointer gap-2">
+                                <span class="text-xs text-gray-400">{lowBandwidth ? 'Enabled' : 'Disabled'}</span>
+                                <input type="checkbox" bind:checked={lowBandwidth} class="rounded border-gray-700 bg-gray-950 text-cyan-500 focus:ring-cyan-500" />
+                            </label>
+                        </div>
                     </div>
 
                     <div class="pt-5 border-t border-gray-800 space-y-3">

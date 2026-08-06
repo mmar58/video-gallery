@@ -1,5 +1,6 @@
-import { writable } from 'svelte/store';
+import { writable, get } from 'svelte/store';
 import { api } from '../lib/api';
+import { authStore } from './auth';
 
 export interface Pagination {
     total: number;
@@ -51,11 +52,17 @@ function createVideoStore() {
             update(s => ({ ...s, loading: true, search, sort, page, selectedTag: tag, days, dateFrom, dateTo, showHidden }));
             try {
                 // Fetch stats generally once or refresh
-                const [videoData, tagsData, statsData] = await Promise.all([
-                    api.fetchVideos(search, sort, page, 12, tag, days, dateFrom, dateTo, showHidden),
+                const [generalSettings, tagsData, statsData] = await Promise.all([
+                    api.fetchGeneralSettings().catch(() => ({ lowBandwidth: { allow: true, limit: 6 } })),
                     api.fetchTags(),
                     api.fetchStats()
                 ]);
+
+                const user = get(authStore).user;
+                const isLowBandwidthEnabled = user?.low_bandwidth && generalSettings?.lowBandwidth?.allow;
+                const currentLimit = isLowBandwidthEnabled ? (generalSettings?.lowBandwidth?.limit || 6) : 12;
+
+                const videoData = await api.fetchVideos(search, sort, page, currentLimit, tag, days, dateFrom, dateTo, showHidden);
 
                 update(s => ({
                     ...s,
@@ -83,7 +90,15 @@ function createVideoStore() {
 
             update(s => ({ ...s, loading: true, page }));
 
-            api.fetchVideos(search, sort, page, 12, selectedTag, days, dateFrom, dateTo, showHidden)
+            api.fetchGeneralSettings()
+                .catch(() => ({ lowBandwidth: { allow: true, limit: 6 } }))
+                .then(generalSettings => {
+                    const user = get(authStore).user;
+                    const isLowBandwidthEnabled = user?.low_bandwidth && generalSettings?.lowBandwidth?.allow;
+                    const currentLimit = isLowBandwidthEnabled ? (generalSettings?.lowBandwidth?.limit || 6) : 12;
+
+                    return api.fetchVideos(search, sort, page, currentLimit, selectedTag, days, dateFrom, dateTo, showHidden);
+                })
                 .then(data => {
                     update(s => ({
                         ...s,
