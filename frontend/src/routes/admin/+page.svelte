@@ -14,12 +14,35 @@
     let activeTab = $state('users');
     let selectedUser = $state(null);
     let userPermissions = $state([]);
+    let generalSettings = $state(null);
 
     onMount(async () => {
         if ($authStore.isAuthenticated && $authStore.user?.is_admin) {
-            await Promise.all([fetchUsers(), fetchDirectories()]);
+            await Promise.all([fetchUsers(), fetchDirectories(), fetchGeneralSettings()]);
         }
     });
+
+    async function fetchGeneralSettings() {
+        const token = localStorage.getItem('token');
+        const res = await fetch(`${SOCKET_URL}/api/settings/general`, { headers: { 'Authorization': `Bearer ${token}` } });
+        if (res.ok) generalSettings = await res.json();
+    }
+
+    async function saveGeneralSettings() {
+        loading = true;
+        const token = localStorage.getItem('token');
+        const res = await fetch(`${SOCKET_URL}/api/settings/general`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify(generalSettings)
+        });
+        if (res.ok) {
+            toast.success('Global settings saved');
+        } else {
+            toast.error('Failed to save settings');
+        }
+        loading = false;
+    }
 
     async function fetchUsers() {
         const token = localStorage.getItem('token');
@@ -161,6 +184,12 @@
                     Permissions: {selectedUser.username}
                 </button>
             {/if}
+            <button 
+                onclick={() => activeTab = 'settings'}
+                class="pb-4 px-2 font-medium transition-colors {activeTab === 'settings' ? 'text-cyan-400 border-b-2 border-cyan-400' : 'text-gray-400 hover:text-gray-200'}"
+            >
+                Global Settings
+            </button>
         </div>
 
         {#if activeTab === 'users'}
@@ -315,6 +344,58 @@
                         {/each}
                     </tbody>
                 </table>
+            </div>
+        {:else if activeTab === 'settings'}
+            <div class="rounded-xl border border-gray-800 bg-gray-900/50 p-6 max-w-2xl">
+                <h3 class="text-lg font-medium text-white mb-2">Low Bandwidth Settings</h3>
+                <p class="text-sm text-gray-400 mb-6">Configure the global behavior for low bandwidth mode.</p>
+                
+                {#if generalSettings}
+                    <div class="space-y-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h4 class="text-sm font-medium text-gray-200">Allow Low Bandwidth Mode</h4>
+                                <p class="text-xs text-gray-500 mt-1">If disabled, users cannot use low bandwidth mode regardless of their preference.</p>
+                            </div>
+                            <label class="flex items-center cursor-pointer">
+                                <input 
+                                    type="checkbox" 
+                                    bind:checked={generalSettings.lowBandwidth.allow}
+                                    class="rounded border-gray-700 bg-gray-950 text-cyan-500 focus:ring-cyan-500" 
+                                />
+                            </label>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-200 mb-1">Max Videos Per Page</label>
+                            <p class="text-xs text-gray-500 mb-2">The number of videos to load at once when low bandwidth mode is enabled (default: 6).</p>
+                            <input 
+                                type="number" 
+                                min="1" 
+                                max="100"
+                                bind:value={generalSettings.lowBandwidth.limit}
+                                class="w-full sm:w-32 rounded-lg border border-gray-700 bg-gray-800 p-2.5 text-sm text-white focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                            >
+                        </div>
+                        
+                        <div class="pt-4 border-t border-gray-800 flex justify-end">
+                            <button 
+                                onclick={saveGeneralSettings}
+                                disabled={loading}
+                                class="flex items-center justify-center gap-2 rounded-lg bg-cyan-600 px-4 py-2 text-sm font-medium text-white hover:bg-cyan-500 transition disabled:opacity-50"
+                            >
+                                {#if loading}
+                                    <Loader2 class="h-4 w-4 animate-spin" />
+                                {/if}
+                                Save Settings
+                            </button>
+                        </div>
+                    </div>
+                {:else}
+                    <div class="flex items-center gap-2 text-gray-400">
+                        <Loader2 class="animate-spin" size={16} /> Loading settings...
+                    </div>
+                {/if}
             </div>
         {/if}
     </div>

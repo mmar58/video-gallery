@@ -44,6 +44,20 @@ router.put('/ollama', async (req, res) => {
     refreshPool();
     res.json(settings);
 });
+router.get('/general', async (req, res) => {
+    const { getLowBandwidthSettings } = require('../data/settingsStore');
+    const lowBandwidth = await getLowBandwidthSettings();
+    res.json({ lowBandwidth });
+});
+router.put('/general', async (req, res) => {
+    const { lowBandwidth } = req.body;
+    const { updateLowBandwidthSettings } = require('../data/settingsStore');
+    if (lowBandwidth) {
+        await updateLowBandwidthSettings(lowBandwidth);
+    }
+    const updatedLowBandwidth = await getLowBandwidthSettings();
+    res.json({ lowBandwidth: updatedLowBandwidth });
+});
 // POST /api/settings/blacklist - Add a word
 router.post('/blacklist', (req, res) => {
     const { word } = req.body;

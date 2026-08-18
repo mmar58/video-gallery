@@ -5,6 +5,7 @@
 
     let username = $state('');
     let password = $state('');
+    let lowBandwidth = $state(false);
     let loading = $state(false);
     let errorMsg = $state('');
 
@@ -13,7 +14,7 @@
         loading = true;
         errorMsg = '';
         
-        const res = await login(username, password);
+        const res = await login(username, password, lowBandwidth);
         if (res.success) {
             goto('/');
         } else {
@@ -72,6 +73,18 @@
                         placeholder="••••••••"
                     />
                 </div>
+            </div>
+
+            <div class="flex items-center gap-2 mt-2">
+                <input 
+                    type="checkbox" 
+                    id="lowBandwidth" 
+                    bind:checked={lowBandwidth}
+                    class="h-4 w-4 rounded border-gray-800 bg-gray-900/50 text-cyan-500 focus:ring-cyan-500 focus:ring-offset-gray-950"
+                />
+                <label for="lowBandwidth" class="text-sm text-gray-400 cursor-pointer">
+                    Enable Low Bandwidth Mode
+                </label>
             </div>
 
             <button

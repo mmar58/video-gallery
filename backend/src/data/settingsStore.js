@@ -6,6 +6,10 @@ const DEFAULT_SETTINGS = {
         endpoints: [
             { id: 'default', url: 'http://127.0.0.1:11434', weight: 1, active: true }
         ]
+    },
+    lowBandwidth: {
+        allow: true,
+        limit: 6
     }
 };
 
@@ -17,6 +21,10 @@ function normalizeSettings(settings = {}) {
             ...DEFAULT_SETTINGS.ollama,
             ...(settings.ollama || {}),
             endpoints: (settings.ollama && settings.ollama.endpoints) || DEFAULT_SETTINGS.ollama.endpoints
+        },
+        lowBandwidth: {
+            ...DEFAULT_SETTINGS.lowBandwidth,
+            ...(settings.lowBandwidth || {})
         }
     };
 }
@@ -70,8 +78,27 @@ async function updateOllamaSettings(updates = {}) {
     return newSettings.ollama;
 }
 
+async function getLowBandwidthSettings() {
+    const settings = await readSettings();
+    return settings.lowBandwidth;
+}
+
+async function updateLowBandwidthSettings(updates = {}) {
+    const settings = await readSettings();
+
+    settings.lowBandwidth = {
+        ...settings.lowBandwidth,
+        ...updates
+    };
+
+    const newSettings = await writeSettings(settings);
+    return newSettings.lowBandwidth;
+}
+
 module.exports = {
     getSettings,
     getOllamaSettings,
-    updateOllamaSettings
+    updateOllamaSettings,
+    getLowBandwidthSettings,
+    updateLowBandwidthSettings
 };
