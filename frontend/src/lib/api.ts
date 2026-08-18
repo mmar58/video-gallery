@@ -20,16 +20,19 @@ export const api = {
         if (hidden) query += `&hidden=true`;
 
         const res = await fetchWithAuth(query);
+        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
         return await res.json();
     },
 
     async fetchStats(): Promise<any> {
         const res = await fetchWithAuth(`${API_URL}/stats`);
+        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
         return await res.json();
     },
 
     async fetchBlacklist(): Promise<any> {
         const res = await fetchWithAuth(`${API_URL.replace('/api/videos', '')}/api/settings/blacklist`);
+        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
         return await res.json();
     },
 
@@ -79,12 +82,14 @@ export const api = {
     // --- Tags ---
     async fetchTags(): Promise<any> {
         const res = await fetchWithAuth(`${API_URL}/tags`);
+        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
         return res.json();
     },
 
     async fetchTagsWithStats(): Promise<any> {
         const baseUrl = API_URL.replace('/api/videos', '');
         const res = await fetchWithAuth(`${baseUrl}/api/tags`);
+        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
         return res.json();
     },
 
