@@ -26,21 +26,7 @@
     }
 
     async function confirmDelete() {
-        isDeleting = true;
-        deletedCount = 0;
-        failedCount = 0;
-
-        for (const video of videos) {
-            try {
-                await api.deleteVideo(video.name);
-                deletedCount++;
-            } catch {
-                failedCount++;
-            }
-        }
-
-        isDeleting = false;
-        dispatch("deleted", { deletedCount, failedCount });
+        dispatch("confirm", { videos: [...videos] });
         close();
     }
 

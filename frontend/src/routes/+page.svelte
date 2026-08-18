@@ -3,6 +3,8 @@
     import { page } from "$app/stores";
     import { videoStore } from "../stores/videoStore";
     import { toast } from "../stores/toastStore";
+    import { logStore, consoleVisibility } from "../stores/logStore";
+    import { api } from "../lib/api";
 
     import { useVideoFilters } from "../lib/useVideoFilters";
     import { usePlayerManager } from "../lib/usePlayerManager";
@@ -56,11 +58,37 @@
     }
     $: filters.syncToUrl($videoStore, $page.url.search);
 
-    function handleBulkDeleted(e: CustomEvent) {
-        const { deletedCount } = e.detail;
-        filters.checkFilterChangesAndLoad(); // Reloads list
+    async function handleBulkDeleteConfirm(e: CustomEvent) {
+        const { videos } = e.detail;
+        const total = videos.length;
+        
         selection.reset();
-        toast.success(`Deleted ${deletedCount} video(s)`);
+        
+        // Optimistic update - remove videos from view immediately
+        videoStore.removeMany(videos.map((v: any) => v.name));
+
+        toast.success(`Started deleting ${total} video(s) in background`);
+        consoleVisibility.set({ isOpen: true, isMinimized: false });
+        logStore.add(`Starting bulk deletion of ${total} video(s)...`, 'info');
+        
+        let deletedCount = 0;
+        let failedCount = 0;
+
+        for (let i = 0; i < total; i++) {
+            const video = videos[i];
+            const name = video.displayName || video.name?.split("::")?.pop() || video.name;
+            try {
+                await api.deleteVideo(video.name);
+                deletedCount++;
+                logStore.add(`Deleted (${i + 1}/${total}): ${name}`, 'success');
+            } catch (err) {
+                failedCount++;
+                logStore.add(`Failed to delete (${i + 1}/${total}): ${name}`, 'error');
+            }
+        }
+        
+        logStore.add(`Bulk deletion complete. ${deletedCount} deleted, ${failedCount} failed.`, 'info');
+        filters.checkFilterChangesAndLoad();
     }
 
     function handleBulkRenamed(e: CustomEvent) {
@@ -123,7 +151,7 @@
     <BulkDeleteModal
         bind:isOpen={isBulkDeleteOpen}
         videos={$selectedVideos}
-        on:deleted={handleBulkDeleted}
+        on:confirm={handleBulkDeleteConfirm}
     />
     <BulkRenameModal
         bind:isOpen={isBulkRenameOpen}

@@ -3,10 +3,11 @@
     import { socket, connectSocket, disconnectSocket } from "../lib/socket";
     import { fly } from "svelte/transition";
     import { X, Minimize2, Maximize2, Terminal, Trash2 } from "lucide-svelte";
+    import { logStore, consoleVisibility } from "../stores/logStore";
 
-    let logs = [];
-    let isOpen = false;
-    let isMinimized = true;
+    $: logs = $logStore;
+    $: isOpen = $consoleVisibility.isOpen;
+    $: isMinimized = $consoleVisibility.isMinimized;
     let logContainer;
     let isRunning = false;
 
@@ -18,16 +19,13 @@
         });
 
         socket.on("tagging-log", (log) => {
-            logs = [...logs, { ...log, timestamp: new Date() }];
+            logStore.add(log.message, log.type);
             // Auto open if it's a "Starting..." message or if closed
             if (!isOpen && (log.message.includes("Starting") || isMinimized)) {
-                if (isMinimized) isMinimized = false;
-                // Don't restart isOpen if user closed it, unless it's a fresh start?
-                // Let's just open it if minimized.
+                if (isMinimized) consoleVisibility.update(v => ({ ...v, isMinimized: false }));
             }
             if (log.message.includes("Starting")) {
-                isOpen = true;
-                isMinimized = false;
+                consoleVisibility.set({ isOpen: true, isMinimized: false });
                 isRunning = true;
             }
         });
@@ -38,13 +36,12 @@
         });
 
         socket.on("thumbnail-log", (log) => {
-            logs = [...logs, { ...log, timestamp: new Date() }];
+            logStore.add(log.message, log.type);
             if (!isOpen && (log.message.includes("Starting") || isMinimized)) {
-                if (isMinimized) isMinimized = false;
+                if (isMinimized) consoleVisibility.update(v => ({ ...v, isMinimized: false }));
             }
             if (log.message.includes("Starting")) {
-                isOpen = true;
-                isMinimized = false;
+                consoleVisibility.set({ isOpen: true, isMinimized: false });
                 isRunning = true;
             }
         });
@@ -65,16 +62,18 @@
     });
 
     function toggleOpen() {
-        isOpen = !isOpen;
-        if (isOpen) isMinimized = false;
+        consoleVisibility.update(v => {
+            const nextOpen = !v.isOpen;
+            return { isOpen: nextOpen, isMinimized: nextOpen ? false : v.isMinimized };
+        });
     }
 
     function toggleMinimize() {
-        isMinimized = !isMinimized;
+        consoleVisibility.update(v => ({ ...v, isMinimized: !v.isMinimized }));
     }
 
     function clearLogs() {
-        logs = [];
+        logStore.clear();
     }
 
     function getLogColor(type) {

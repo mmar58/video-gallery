@@ -20,3 +20,4 @@ function createLogStore() {
 }
 
 export const logStore = createLogStore();
+export const consoleVisibility = writable({ isOpen: false, isMinimized: true });

@@ -163,6 +163,13 @@ function createVideoStore() {
                 videos: s.videos.filter(v => v.name !== filename)
             }));
         },
+        removeMany: (filenames: string[]) => {
+            const nameSet = new Set(filenames);
+            update(s => ({
+                ...s,
+                videos: s.videos.filter(v => !nameSet.has(v.name))
+            }));
+        },
         hideVideo: async (filename: string, days: number | string) => {
             await api.hideVideo(filename, days);
             update(s => ({

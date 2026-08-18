@@ -14,20 +14,20 @@ const authenticateToken = (req, res, next) => {
         token = req.query.token;
     }
     if (!token)
-        return res.sendStatus(401); // Unauthorized
+        return res.status(401).json({ error: 'Unauthorized' });
     jsonwebtoken_1.default.verify(token, JWT_SECRET, async (err, decoded) => {
         if (err)
-            return res.sendStatus(403); // Forbidden
+            return res.status(403).json({ error: 'Forbidden' });
         try {
             const user = await (0, db_1.default)('users').where({ id: decoded.id }).first();
             if (!user)
-                return res.sendStatus(403);
+                return res.status(403).json({ error: 'Forbidden' });
             req.user = user;
             next();
         }
         catch (dbError) {
             console.error('Error fetching user in auth middleware', dbError);
-            res.sendStatus(500);
+            res.status(500).json({ error: 'Internal Server Error' });
         }
     });
 };
