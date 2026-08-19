@@ -8,28 +8,77 @@ class OllamaPool {
         this.activeRequests = new Map(); // id -> count
         this.queue = []; // { taskFn, resolve, reject, timestamp }
         this.queueCheckInterval = null;
-        
+
         // Timeout for tasks in queue
-        this.QUEUE_TIMEOUT_MS = 5 * 60 * 1000; 
+        this.QUEUE_TIMEOUT_MS = 5 * 60 * 1000;
     }
 
     async initOrRefresh() {
         try {
             const settings = await getOllamaSettings();
-            this.endpoints = settings.endpoints || [{ id: 'default', url: 'http://127.0.0.1:11434', weight: 1, active: true }];
-            
+            const newEndpoints = settings.endpoints || [{ id: 'default', url: 'http://127.0.0.1:11434', weight: 1, active: true }];
+
+            // Clear existing intervals for endpoints before refreshing
+            for (const ep of this.endpoints) {
+                if (ep.healthCheckInterval) {
+                    clearInterval(ep.healthCheckInterval);
+                }
+            }
+
+            this.endpoints = newEndpoints;
+
             // Setup clients for new endpoints
             for (const ep of this.endpoints) {
                 if (!this.clients.has(ep.id)) {
                     this.clients.set(ep.id, new Ollama({ host: ep.url }));
                     this.activeRequests.set(ep.id, 0);
                 }
+
+                if (ep.active) {
+                    this.checkInitialHealth(ep);
+                }
             }
-            
+
             this.processQueue();
         } catch (error) {
             console.error('[OllamaPool] Failed to refresh endpoints', error);
         }
+    }
+
+    async checkInitialHealth(ep) {
+        try {
+            const client = this.clients.get(ep.id);
+            // console.log(client)
+            let modelList = await client.list();
+            // console.log(modelList, "for", client.config)
+        } catch (error) {
+            console.warn(`[OllamaPool] Endpoint ${ep.url} is offline on initialization. Disabling.`);
+            // console.log("Warn", error)
+            ep.active = false;
+            this.startHealthCheckLoop(ep);
+        }
+    }
+
+    startHealthCheckLoop(ep) {
+        if (ep.healthCheckInterval) return; // already checking
+
+        console.log(`[OllamaPool] Starting health checks for failed endpoint ${ep.url}...`);
+
+        ep.healthCheckInterval = setInterval(async () => {
+            try {
+                const client = this.clients.get(ep.id);
+                await client.list(); // Simple ping
+
+                console.log(`[OllamaPool] Endpoint ${ep.url} is back online. Re-enabling.`);
+                ep.active = true;
+                clearInterval(ep.healthCheckInterval);
+                ep.healthCheckInterval = null;
+
+                this.processQueue();
+            } catch (error) {
+                // Silently fail and wait for next check
+            }
+        }, 60000);
     }
 
     startQueueMonitor() {
@@ -54,7 +103,7 @@ class OllamaPool {
 
     getAvailableEndpoint() {
         const activeEndpoints = this.endpoints.filter(ep => ep.active);
-        
+
         if (activeEndpoints.length === 0) {
             return null;
         }
@@ -91,7 +140,7 @@ class OllamaPool {
 
     async executeTaskOnEndpoint(item, ep) {
         const { taskFn, resolve, reject, retries = 0 } = item;
-        
+
         const currentCount = this.activeRequests.get(ep.id) || 0;
         this.activeRequests.set(ep.id, currentCount + 1);
 
@@ -101,11 +150,11 @@ class OllamaPool {
             resolve(result);
         } catch (error) {
             console.error(`[OllamaPool] Task failed on endpoint ${ep.url}:`, error.message);
-            
+
             // Mark endpoint as inactive temporarily in memory to force failover
             console.warn(`[OllamaPool] Temporarily disabling endpoint ${ep.url} due to failure.`);
             ep.active = false;
-            
+
             // Handle failover
             if (retries < 2) {
                 console.log(`[OllamaPool] Retrying task... (Attempt ${retries + 1})`);
@@ -113,13 +162,9 @@ class OllamaPool {
             } else {
                 reject(new Error(`Failed after retries. Last error: ${error.message}`));
             }
-            
-            // Re-enable after 1 minute to test it again
-            setTimeout(() => {
-                console.log(`[OllamaPool] Re-enabling endpoint ${ep.url} after failure cooldown.`);
-                ep.active = true;
-                this.processQueue();
-            }, 60000);
+
+            // Start checking health in the background before re-enabling
+            this.startHealthCheckLoop(ep);
 
         } finally {
             const newCount = (this.activeRequests.get(ep.id) || 1) - 1;
@@ -140,7 +185,7 @@ class OllamaPool {
 
         return new Promise((resolve, reject) => {
             const item = { taskFn, resolve, reject, timestamp: Date.now(), retries: 0 };
-            
+
             const ep = this.getAvailableEndpoint();
             if (ep) {
                 this.executeTaskOnEndpoint(item, ep);
