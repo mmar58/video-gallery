@@ -101,8 +101,8 @@ class OllamaPool {
         this.processQueue();
     }
 
-    getAvailableEndpoint() {
-        const activeEndpoints = this.endpoints.filter(ep => ep.active);
+    getAvailableEndpoint(allowedEndpointIds = null) {
+        const activeEndpoints = this.endpoints.filter(ep => ep.active && (!allowedEndpointIds || allowedEndpointIds.includes(ep.id)));
 
         if (activeEndpoints.length === 0) {
             return null;
@@ -131,10 +131,14 @@ class OllamaPool {
     processQueue() {
         if (this.queue.length === 0) return;
 
-        const ep = this.getAvailableEndpoint();
-        if (ep) {
-            const item = this.queue.shift();
-            this.executeTaskOnEndpoint(item, ep);
+        for (let i = 0; i < this.queue.length; i++) {
+            const item = this.queue[i];
+            const ep = this.getAvailableEndpoint(item.allowedEndpointIds);
+            if (ep) {
+                this.queue.splice(i, 1);
+                this.executeTaskOnEndpoint(item, ep);
+                return; // process one at a time, executeTaskOnEndpoint will call processQueue again
+            }
         }
     }
 
@@ -173,20 +177,20 @@ class OllamaPool {
         }
     }
 
-    async dispatchTask(taskFn) {
+    async dispatchTask(taskFn, allowedEndpointIds = null) {
         if (this.endpoints.length === 0) {
             await this.initOrRefresh();
         }
 
-        const activeEndpoints = this.endpoints.filter(ep => ep.active);
+        const activeEndpoints = this.endpoints.filter(ep => ep.active && (!allowedEndpointIds || allowedEndpointIds.includes(ep.id)));
         if (activeEndpoints.length === 0) {
-            throw new Error('No active Ollama endpoints available. Please check settings.');
+            throw new Error('No active Ollama endpoints available for this task. Please check settings.');
         }
 
         return new Promise((resolve, reject) => {
-            const item = { taskFn, resolve, reject, timestamp: Date.now(), retries: 0 };
+            const item = { taskFn, resolve, reject, timestamp: Date.now(), retries: 0, allowedEndpointIds };
 
-            const ep = this.getAvailableEndpoint();
+            const ep = this.getAvailableEndpoint(allowedEndpointIds);
             if (ep) {
                 this.executeTaskOnEndpoint(item, ep);
             } else {
@@ -205,8 +209,32 @@ class OllamaPool {
         });
     }
 
-    async generateTagsFromText(modelName, text, prompt = "Generate 5-10 relevant keywords or tags based on this text. Comma separated, no intro.", signal) {
-        return this.dispatchTask(async (client) => {
+    async getModelsPerServer() {
+        if (this.endpoints.length === 0) {
+            await this.initOrRefresh();
+        }
+
+        const activeEndpoints = this.endpoints.filter(ep => ep.active);
+        const results = await Promise.all(activeEndpoints.map(async ep => {
+            try {
+                const client = this.clients.get(ep.id);
+                const response = await client.list();
+                return { endpoint: ep, models: response.models };
+            } catch (err) {
+                return { endpoint: ep, models: [] };
+            }
+        }));
+        return results;
+    }
+
+    async generateTagsFromText(modelMap, text, prompt = "Generate 5-10 relevant keywords or tags based on this text. Comma separated, no intro.", signal) {
+        const isMap = typeof modelMap === 'object';
+        const allowedEndpointIds = isMap 
+            ? Object.keys(modelMap).filter(id => modelMap[id] && modelMap[id] !== 'skip')
+            : null;
+
+        return this.dispatchTask(async (client, ep) => {
+            const modelName = isMap ? modelMap[ep.id] : modelMap;
             const timeoutMs = 45000;
 
             const generatePromise = client.generate({
@@ -237,6 +265,7 @@ const pool = new OllamaPool();
 
 module.exports = {
     getModels: () => pool.getModels(),
+    getModelsPerServer: () => pool.getModelsPerServer(),
     generateTagsFromText: (m, t, p, s) => pool.generateTagsFromText(m, t, p, s),
     refreshPool: () => pool.initOrRefresh()
 };

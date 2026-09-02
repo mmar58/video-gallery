@@ -36,21 +36,11 @@ module.exports = (io) => {
             }
         });
 
-        socket.on('start-tagging', async (data) => {
-            if (socket.isTagging) {
-                socket.emit('tagging-log', { message: 'Tagging already in progress.', type: 'warning' });
-                return;
-            }
-
+        async function runTagging(modelMap, socket, data) {
             socket.isTagging = true;
             socket.abortController = new AbortController();
             socket.emit('tagging-status', { isTagging: true });
-
-            const { model } = data || {};
-            const settings = await getOllamaSettings();
-            const modelName = model || settings.tagModel || 'llama3';
-
-            console.log(`Starting auto-tagging with model: ${modelName}`);
+            
             socket.emit('tagging-log', { message: `Starting...`, type: 'info' });
 
             try {
@@ -67,58 +57,70 @@ module.exports = (io) => {
 
                 socket.emit('tagging-log', { message: `Found ${videos.length} videos.`, type: 'info' });
 
-                for (const video of videos) {
-                    // Double check stop status before starting next
-                    if (!socket.isTagging) {
-                        break;
-                    }
-
-                    const meta = await store.get(video);
-                    if (meta.tags && meta.tags.length > 0) {
-                        continue;
-                    }
-
-                    socket.emit('tagging-log', { message: `Analysing: ${video.slice(0, 25)}...`, type: 'info' });
-
-                    const baseName = path.basename(video, path.extname(video));
-                    const prompt = "Generate 5-8 relevant, concise keywords/tags based on the filename. Return ONLY tags, comma-separated. No sentences.";
-
-                    try {
-                        // Pass signal to service
-                        const response = await generateTagsFromText(modelName, baseName, prompt, socket.abortController.signal);
-
-                        let rawTags = response.split(/,|;|\n/).map(t => t.trim()).filter(t => t.length > 0);
-
-                        const blacklist = getBlacklist();
-                        rawTags = rawTags.filter(t => !blacklist.includes(t.toLowerCase()));
-
-                        const tags = rawTags.filter(t => t.length < 30);
-
-                        if (tags.length > 0) {
-                            await store.update(video, { tags: tags });
-                            socket.emit('tagging-log', { message: `Tagged: ${tags.join(', ')}`, type: 'success' });
-                        } else {
-                            socket.emit('tagging-log', { message: `No tags generated.`, type: 'warning' });
-                        }
-
-                        // Small delay to allow event loop to process other events (like stop)
-                        await new Promise(resolve => setTimeout(resolve, 1000));
-
-                    } catch (err) {
-                        if (err.message === 'Aborted' || err.name === 'AbortError') {
-                            socket.emit('tagging-log', { message: 'Tagging stopped.', type: 'warning' });
-                            break; // Exit loop
-                        }
-                        console.error(`Error tagging ${video}:`, err);
-                        socket.emit('tagging-log', { message: `Error: ${err.message}`, type: 'error' });
+                const { getModelsPerServer } = require('../services/ollamaService');
+                const servers = await getModelsPerServer();
+                let concurrency = 0;
+                for (const server of servers) {
+                    const epId = server.endpoint.id;
+                    if (modelMap[epId] && modelMap[epId] !== 'skip') {
+                        concurrency += server.endpoint.weight;
                     }
                 }
+                if (concurrency < 1) concurrency = 1;
+
+                let index = 0;
+                const blacklist = getBlacklist();
+
+                async function worker() {
+                    while (index < videos.length && socket.isTagging) {
+                        const video = videos[index++];
+                        
+                        const meta = await store.get(video);
+                        if (meta.tags && meta.tags.length > 0) {
+                            continue;
+                        }
+
+                        socket.emit('tagging-log', { message: `Analysing: ${video.slice(0, 25)}...`, type: 'info' });
+
+                        const baseName = path.basename(video, path.extname(video));
+                        const prompt = "Generate 5-8 relevant, concise keywords/tags based on the filename. Return ONLY tags, comma-separated. No sentences.";
+
+                        try {
+                            const response = await generateTagsFromText(modelMap, baseName, prompt, socket.abortController.signal);
+
+                            let rawTags = response.split(/,|;|\n/).map(t => t.trim()).filter(t => t.length > 0);
+                            rawTags = rawTags.filter(t => !blacklist.includes(t.toLowerCase()));
+                            const tags = rawTags.filter(t => t.length < 30);
+
+                            if (tags.length > 0) {
+                                await store.update(video, { tags: tags });
+                                socket.emit('tagging-log', { message: `Tagged: ${tags.join(', ')}`, type: 'success' });
+                            } else {
+                                socket.emit('tagging-log', { message: `No tags generated.`, type: 'warning' });
+                            }
+
+                            await new Promise(resolve => setTimeout(resolve, 1000));
+                        } catch (err) {
+                            if (err.message === 'Aborted' || err.name === 'AbortError') {
+                                socket.emit('tagging-log', { message: 'Tagging stopped.', type: 'warning' });
+                                break;
+                            }
+                            console.error(`Error tagging ${video}:`, err);
+                            socket.emit('tagging-log', { message: `Error: ${err.message}`, type: 'error' });
+                        }
+                    }
+                }
+
+                const workers = [];
+                for (let i = 0; i < concurrency; i++) {
+                    workers.push(worker());
+                }
+                await Promise.all(workers);
 
                 if (socket.isTagging) {
                     socket.emit('tagging-log', { message: 'Process complete!', type: 'success' });
                     socket.emit('tagging-complete');
                 }
-
             } catch (err) {
                 console.error('Tagging fatal error:', err);
                 socket.emit('tagging-log', { message: 'Fatal error.', type: 'error' });
@@ -126,6 +128,54 @@ module.exports = (io) => {
                 socket.isTagging = false;
                 socket.emit('tagging-status', { isTagging: false });
                 socket.abortController = null;
+            }
+        }
+
+        socket.on('start-tagging-confirmed', async (data) => {
+            if (socket.isTagging) return;
+            await runTagging(data.modelMap, socket, data);
+        });
+
+        socket.on('start-tagging', async (data) => {
+            if (socket.isTagging) {
+                socket.emit('tagging-log', { message: 'Tagging already in progress.', type: 'warning' });
+                return;
+            }
+
+            const { model } = data || {};
+            const settings = await getOllamaSettings();
+            const modelName = model || settings.tagModel || 'llama3';
+
+            console.log(`Checking models for auto-tagging with default model: ${modelName}`);
+
+            try {
+                const { getModelsPerServer } = require('../services/ollamaService');
+                const servers = await getModelsPerServer();
+                
+                const mismatchServers = [];
+                const modelMap = {};
+
+                for (const server of servers) {
+                    const hasModel = server.models.some(m => m.name === modelName);
+                    if (!hasModel) {
+                        mismatchServers.push(server);
+                    }
+                    modelMap[server.endpoint.id] = modelName;
+                }
+
+                if (mismatchServers.length > 0) {
+                    socket.emit('tagging-model-mismatch', {
+                        servers: mismatchServers,
+                        defaultModel: modelName,
+                        modelMap
+                    });
+                    return;
+                }
+
+                await runTagging(modelMap, socket, data);
+            } catch (err) {
+                console.error('Error in start-tagging setup:', err);
+                socket.emit('tagging-log', { message: 'Fatal error checking servers.', type: 'error' });
             }
         });
 
