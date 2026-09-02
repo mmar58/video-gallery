@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
     import { createEventDispatcher, onMount, onDestroy } from "svelte";
     import { api } from "../lib/api";
     import { socket } from "../lib/socket";
@@ -7,13 +7,13 @@
     export let isOpen = false;
 
     const dispatch = createEventDispatcher();
-    let models = [];
+    let models: any[] = [];
     let selectedModel = "";
     let loading = false;
     
     let resolvingMismatch = false;
-    let mismatchData = null;
-    let serverResolutions = {};
+    let mismatchData: any = null;
+    let serverResolutions: Record<string, { action: string, model: string }> = {};
 
     async function load() {
         try {
@@ -59,13 +59,13 @@
         mismatchData = null;
     }
 
-    function handleMismatch(data) {
+    function handleMismatch(data: any) {
         if (!isOpen) return;
         mismatchData = data;
         resolvingMismatch = true;
         
         serverResolutions = {};
-        data.servers.forEach(s => {
+        data.servers.forEach((s: any) => {
             serverResolutions[s.endpoint.id] = {
                 action: s.models.length > 0 ? 'select' : 'skip',
                 model: s.models.length > 0 ? s.models[0].name : ''
@@ -73,7 +73,7 @@
         });
     }
 
-    function handleStatus(data) {
+    function handleStatus(data: any) {
         if (data.isTagging && isOpen) {
             dispatch("started");
             close();

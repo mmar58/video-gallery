@@ -44,18 +44,23 @@ module.exports = (io) => {
             socket.emit('tagging-log', { message: `Starting...`, type: 'info' });
 
             try {
-                if (!fs.existsSync(VIDEO_DIR)) {
-                    socket.emit('tagging-log', { message: 'Video directory not found!', type: 'error' });
-                    return;
+                const db = require('../data/db');
+                const dirs = await db('root_directories').select('*');
+                let allVideos = [];
+                
+                for (const dir of dirs) {
+                    if (!fs.existsSync(dir.path)) continue;
+                    const files = fs.readdirSync(dir.path);
+                    const videos = files.filter(file => {
+                        const ext = path.extname(file).toLowerCase();
+                        return ['.mp4', '.webm', '.ogg', '.mov', '.mkv', '.m4v', '.avi'].includes(ext);
+                    }).map(file => {
+                        return { dirId: dir.id, filename: file, path: path.join(dir.path, file) };
+                    });
+                    allVideos = allVideos.concat(videos);
                 }
 
-                const files = fs.readdirSync(VIDEO_DIR);
-                const videos = files.filter(file => {
-                    const ext = path.extname(file).toLowerCase();
-                    return ['.mp4', '.webm', '.ogg', '.mov'].includes(ext);
-                });
-
-                socket.emit('tagging-log', { message: `Found ${videos.length} videos.`, type: 'info' });
+                socket.emit('tagging-log', { message: `Found ${allVideos.length} videos.`, type: 'info' });
 
                 const { getModelsPerServer } = require('../services/ollamaService');
                 const servers = await getModelsPerServer();
@@ -72,17 +77,17 @@ module.exports = (io) => {
                 const blacklist = getBlacklist();
 
                 async function worker() {
-                    while (index < videos.length && socket.isTagging) {
-                        const video = videos[index++];
+                    while (index < allVideos.length && socket.isTagging) {
+                        const videoObj = allVideos[index++];
                         
-                        const meta = await store.get(video);
+                        const meta = await store.get(videoObj.filename);
                         if (meta.tags && meta.tags.length > 0) {
                             continue;
                         }
 
-                        socket.emit('tagging-log', { message: `Analysing: ${video.slice(0, 25)}...`, type: 'info' });
+                        socket.emit('tagging-log', { message: `Analysing: ${videoObj.filename.slice(0, 25)}...`, type: 'info' });
 
-                        const baseName = path.basename(video, path.extname(video));
+                        const baseName = path.basename(videoObj.filename, path.extname(videoObj.filename));
                         const prompt = "Generate 5-8 relevant, concise keywords/tags based on the filename. Return ONLY tags, comma-separated. No sentences.";
 
                         try {
@@ -93,7 +98,7 @@ module.exports = (io) => {
                             const tags = rawTags.filter(t => t.length < 30);
 
                             if (tags.length > 0) {
-                                await store.update(video, { tags: tags });
+                                await store.update(videoObj.filename, { tags: tags });
                                 socket.emit('tagging-log', { message: `Tagged: ${tags.join(', ')}`, type: 'success' });
                             } else {
                                 socket.emit('tagging-log', { message: `No tags generated.`, type: 'warning' });
@@ -105,7 +110,7 @@ module.exports = (io) => {
                                 socket.emit('tagging-log', { message: 'Tagging stopped.', type: 'warning' });
                                 break;
                             }
-                            console.error(`Error tagging ${video}:`, err);
+                            console.error(`Error tagging ${videoObj.filename}:`, err);
                             socket.emit('tagging-log', { message: `Error: ${err.message}`, type: 'error' });
                         }
                     }
@@ -202,52 +207,47 @@ module.exports = (io) => {
             const { generateThumbnail, generatePreview } = require('../services/thumbnailService');
 
             try {
-                if (!fs.existsSync(VIDEO_DIR)) {
-                    socket.emit('thumbnail-log', { message: 'Video directory not found!', type: 'error' });
-                    return;
+                const db = require('../data/db');
+                const dirs = await db('root_directories').select('*');
+                let allVideos = [];
+                
+                for (const dir of dirs) {
+                    if (!fs.existsSync(dir.path)) continue;
+                    const files = fs.readdirSync(dir.path);
+                    const videos = files.filter(file => {
+                        const ext = path.extname(file).toLowerCase();
+                        return ['.mp4', '.webm', '.ogg', '.mov', '.mkv', '.m4v', '.avi'].includes(ext);
+                    }).map(file => {
+                        return { dirId: dir.id, filename: file, path: path.join(dir.path, file) };
+                    });
+                    allVideos = allVideos.concat(videos);
                 }
 
-                const files = fs.readdirSync(VIDEO_DIR);
-                const videos = files.filter(file => {
-                    const ext = path.extname(file).toLowerCase();
-                    return ['.mp4', '.webm', '.ogg', '.mov'].includes(ext);
-                });
+                socket.emit('thumbnail-log', { message: `Found ${allVideos.length} videos.`, type: 'info' });
 
-                socket.emit('thumbnail-log', { message: `Found ${videos.length} videos.`, type: 'info' });
-
-                for (const [index, video] of videos.entries()) {
+                for (const [index, videoObj] of allVideos.entries()) {
                     if (!socket.isGeneratingThumbnails) break;
 
-                    const percent = Math.round(((index + 1) / videos.length) * 100);
+                    const percent = Math.round(((index + 1) / allVideos.length) * 100);
                     socket.emit('thumbnail-progress', percent);
-                    socket.emit('thumbnail-log', { message: `Processing ${video}...`, type: 'info' });
+                    socket.emit('thumbnail-log', { message: `Processing ${videoObj.filename}...`, type: 'info' });
 
                     try {
-                        // 1. Static Thumbnail
-                        // By default service checks existence. If "force" is true, we might need to delete first or just rely on overwrite if service supports it.
-                        // Impl: create logic to skip if exists and !force
-                        // ... Since we can't easily peek into service, let's just call it. Service currently checks fs.existsSync.
-                        // Ideally we should update service to accept 'force'. 
-                        // For now we will rely on service's check. If user wants FORCE, we should probably delete the file before calling generate.
-
+                        const combinedName = `${videoObj.dirId}::${videoObj.filename}`;
                         const THUMB_DIR = config.thumbnailsDir;
-                        const videoThumbDir = path.join(THUMB_DIR, video);
+                        const videoThumbDir = path.join(THUMB_DIR, combinedName);
                         const tPath = path.join(videoThumbDir, 'thumbnail.jpg');
                         const pPath = path.join(videoThumbDir, 'preview.jpg');
 
-                        // Static
-                        // If force, we can just delete the whole folder? Or individual files?
-                        // Service will mkdir if needed.
                         if (force && fs.existsSync(tPath)) fs.unlinkSync(tPath);
-                        await generateThumbnail(video);
+                        await generateThumbnail(combinedName);
 
-                        // Preview
                         if (previews) {
                             if (force && fs.existsSync(pPath)) fs.unlinkSync(pPath);
-                            await generatePreview(video);
+                            await generatePreview(combinedName);
                         }
 
-                        socket.emit('thumbnail-log', { message: `Generated for ${video}`, type: 'success' });
+                        socket.emit('thumbnail-log', { message: `Generated for ${videoObj.filename}`, type: 'success' });
                     } catch (err) {
                         socket.emit('thumbnail-log', { message: `Error: ${err.message}`, type: 'error' });
                     }

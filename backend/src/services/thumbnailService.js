@@ -14,6 +14,24 @@ if (!fs.existsSync(THUMBNAIL_DIR)) {
     fs.mkdirSync(THUMBNAIL_DIR, { recursive: true });
 }
 
+const db = require('../data/db');
+
+// Helper to parse filename and resolve actual path
+const parseFilename = (combined) => {
+    const parts = combined.split('::');
+    if (parts.length < 2) return { dirId: null, filename: combined };
+    return { dirId: parseInt(parts[0]), filename: parts.slice(1).join('::') };
+};
+
+const getVideoPath = async (combinedName) => {
+    const { dirId, filename } = parseFilename(combinedName);
+    if (dirId) {
+        const dir = await db('root_directories').where({ id: dirId }).first();
+        if (dir) return path.join(dir.path, filename);
+    }
+    return path.join(VIDEO_DIR, filename); // Fallback
+};
+
 // Helper: Get folder for specific video
 const getVideoThumbDir = (filename) => {
     return path.join(THUMBNAIL_DIR, filename);
@@ -51,7 +69,7 @@ const getVideoDuration = (filePath) => {
 // Generate 5 thumbnails at 20% intervals
 const generateThumbnail = (filename) => {
     return new Promise(async (resolve, reject) => {
-        const videoPath = path.join(VIDEO_DIR, filename);
+        const videoPath = await getVideoPath(filename);
         const outputDir = getVideoThumbDir(filename);
         const mainThumbnailPath = path.join(outputDir, 'thumbnail_1.jpg');
 
@@ -99,7 +117,7 @@ const generateThumbnail = (filename) => {
 
 const generatePreview = (filename) => {
     return new Promise(async (resolve, reject) => {
-        const videoPath = path.join(VIDEO_DIR, filename);
+        const videoPath = await getVideoPath(filename);
         const outputDir = getVideoThumbDir(filename);
         const previewPath = path.join(outputDir, 'preview.jpg');
 
