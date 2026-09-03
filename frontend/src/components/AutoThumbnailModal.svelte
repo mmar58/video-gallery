@@ -17,9 +17,11 @@
     }
 
     function startGeneration() {
+        const token = localStorage.getItem('token');
         socket.emit("start-thumbnails", {
             force: forceRegenerate,
             previews: generatePreviews,
+            token
         });
         dispatch("started");
         isOpen = false;

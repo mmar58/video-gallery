@@ -17,6 +17,31 @@ const getBlacklist = () => {
     } catch (e) { return []; }
 };
 
+const jwt = require('jsonwebtoken');
+const JWT_SECRET = process.env.JWT_SECRET || 'your_default_secret_key_change_in_production';
+
+const getUserIdFromToken = (token) => {
+    if (!token) return null;
+    try {
+        const decoded = jwt.verify(token, JWT_SECRET);
+        return decoded.id;
+    } catch (err) {
+        return null;
+    }
+};
+
+const getAllowedDirectories = async (userId) => {
+    const db = require('../data/db');
+    const dirs = await db('root_directories').select('*');
+    if (!userId) return []; // Require valid user to get directories
+    
+    const hiddenPerms = await db('user_directory_permissions')
+        .where({ user_id: userId, is_hidden: true });
+        
+    const hiddenDirIds = new Set(hiddenPerms.map(p => p.directory_id));
+    return dirs.filter(d => !hiddenDirIds.has(d.id));
+};
+
 module.exports = (io) => {
     io.on('connection', (socket) => {
         console.log('Client connected:', socket.id);
@@ -44,8 +69,13 @@ module.exports = (io) => {
             socket.emit('tagging-log', { message: `Starting...`, type: 'info' });
 
             try {
-                const db = require('../data/db');
-                const dirs = await db('root_directories').select('*');
+                const userId = getUserIdFromToken(data.token);
+                if (!userId) {
+                    socket.emit('tagging-log', { message: 'Unauthorized: Invalid token.', type: 'error' });
+                    return;
+                }
+
+                const dirs = await getAllowedDirectories(userId);
                 let allVideos = [];
                 
                 for (const dir of dirs) {
@@ -207,8 +237,13 @@ module.exports = (io) => {
             const { generateThumbnail, generatePreview } = require('../services/thumbnailService');
 
             try {
-                const db = require('../data/db');
-                const dirs = await db('root_directories').select('*');
+                const userId = getUserIdFromToken(data.token);
+                if (!userId) {
+                    socket.emit('thumbnail-log', { message: 'Unauthorized: Invalid token.', type: 'error' });
+                    return;
+                }
+
+                const dirs = await getAllowedDirectories(userId);
                 let allVideos = [];
                 
                 for (const dir of dirs) {

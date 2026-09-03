@@ -90,7 +90,8 @@
     function startTagging() {
         if (!selectedModel) return;
         loading = true;
-        socket.emit("start-tagging", { model: selectedModel });
+        const token = localStorage.getItem('token');
+        socket.emit("start-tagging", { model: selectedModel, token });
         // We don't close here, we wait for 'tagging-status' or 'tagging-model-mismatch'
         setTimeout(() => { loading = false; }, 2000); // safety fallback for loading state
     }
@@ -101,7 +102,8 @@
             modelMap[id] = res.action === 'skip' ? 'skip' : res.model;
         }
         loading = true;
-        socket.emit("start-tagging-confirmed", { modelMap });
+        const token = localStorage.getItem('token');
+        socket.emit("start-tagging-confirmed", { modelMap, token });
     }
 </script>
 
