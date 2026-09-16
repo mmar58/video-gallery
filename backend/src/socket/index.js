@@ -121,7 +121,17 @@ module.exports = (io) => {
                         const prompt = "Generate 5-8 relevant, concise keywords/tags based on the filename. Return ONLY tags, comma-separated. No sentences.";
 
                         try {
-                            const response = await generateTagsFromText(modelMap, baseName, prompt, socket.abortController.signal);
+                            const response = await generateTagsFromText(
+                                modelMap, 
+                                baseName, 
+                                prompt, 
+                                socket.abortController.signal,
+                                (msg, type) => {
+                                    if (socket.isTagging) {
+                                        socket.emit('tagging-log', { message: msg, type });
+                                    }
+                                }
+                            );
 
                             let rawTags = response.split(/,|;|\n/).map(t => t.trim()).filter(t => t.length > 0);
                             rawTags = rawTags.filter(t => !blacklist.includes(t.toLowerCase()));

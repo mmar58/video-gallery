@@ -18,6 +18,29 @@ const getBlacklist = () => {
         return [];
     }
 };
+const jwt = require('jsonwebtoken');
+const JWT_SECRET = process.env.JWT_SECRET || 'your_default_secret_key_change_in_production';
+const getUserIdFromToken = (token) => {
+    if (!token)
+        return null;
+    try {
+        const decoded = jwt.verify(token, JWT_SECRET);
+        return decoded.id;
+    }
+    catch (err) {
+        return null;
+    }
+};
+const getAllowedDirectories = async (userId) => {
+    const db = require('../data/db');
+    const dirs = await db('root_directories').select('*');
+    if (!userId)
+        return []; // Require valid user to get directories
+    const hiddenPerms = await db('user_directory_permissions')
+        .where({ user_id: userId, is_hidden: true });
+    const hiddenDirIds = new Set(hiddenPerms.map(p => p.directory_id));
+    return dirs.filter(d => !hiddenDirIds.has(d.id));
+};
 module.exports = (io) => {
     io.on('connection', (socket) => {
         console.log('Client connected:', socket.id);
@@ -34,68 +57,88 @@ module.exports = (io) => {
                 socket.emit('tagging-status', { isTagging: false });
             }
         });
-        socket.on('start-tagging', async (data) => {
-            if (socket.isTagging) {
-                socket.emit('tagging-log', { message: 'Tagging already in progress.', type: 'warning' });
-                return;
-            }
+        async function runTagging(modelMap, socket, data) {
             socket.isTagging = true;
             socket.abortController = new AbortController();
             socket.emit('tagging-status', { isTagging: true });
-            const { model } = data || {};
-            const settings = await getOllamaSettings();
-            const modelName = model || settings.tagModel || 'llama3';
-            console.log(`Starting auto-tagging with model: ${modelName}`);
             socket.emit('tagging-log', { message: `Starting...`, type: 'info' });
             try {
-                if (!fs.existsSync(VIDEO_DIR)) {
-                    socket.emit('tagging-log', { message: 'Video directory not found!', type: 'error' });
+                const userId = getUserIdFromToken(data.token);
+                if (!userId) {
+                    socket.emit('tagging-log', { message: 'Unauthorized: Invalid token.', type: 'error' });
                     return;
                 }
-                const files = fs.readdirSync(VIDEO_DIR);
-                const videos = files.filter(file => {
-                    const ext = path.extname(file).toLowerCase();
-                    return ['.mp4', '.webm', '.ogg', '.mov'].includes(ext);
-                });
-                socket.emit('tagging-log', { message: `Found ${videos.length} videos.`, type: 'info' });
-                for (const video of videos) {
-                    // Double check stop status before starting next
-                    if (!socket.isTagging) {
-                        break;
-                    }
-                    const meta = await store.get(video);
-                    if (meta.tags && meta.tags.length > 0) {
+                const dirs = await getAllowedDirectories(userId);
+                let allVideos = [];
+                for (const dir of dirs) {
+                    if (!fs.existsSync(dir.path))
                         continue;
-                    }
-                    socket.emit('tagging-log', { message: `Analysing: ${video.slice(0, 25)}...`, type: 'info' });
-                    const baseName = path.basename(video, path.extname(video));
-                    const prompt = "Generate 5-8 relevant, concise keywords/tags based on the filename. Return ONLY tags, comma-separated. No sentences.";
-                    try {
-                        // Pass signal to service
-                        const response = await generateTagsFromText(modelName, baseName, prompt, socket.abortController.signal);
-                        let rawTags = response.split(/,|;|\n/).map(t => t.trim()).filter(t => t.length > 0);
-                        const blacklist = getBlacklist();
-                        rawTags = rawTags.filter(t => !blacklist.includes(t.toLowerCase()));
-                        const tags = rawTags.filter(t => t.length < 30);
-                        if (tags.length > 0) {
-                            await store.update(video, { tags: tags });
-                            socket.emit('tagging-log', { message: `Tagged: ${tags.join(', ')}`, type: 'success' });
-                        }
-                        else {
-                            socket.emit('tagging-log', { message: `No tags generated.`, type: 'warning' });
-                        }
-                        // Small delay to allow event loop to process other events (like stop)
-                        await new Promise(resolve => setTimeout(resolve, 1000));
-                    }
-                    catch (err) {
-                        if (err.message === 'Aborted' || err.name === 'AbortError') {
-                            socket.emit('tagging-log', { message: 'Tagging stopped.', type: 'warning' });
-                            break; // Exit loop
-                        }
-                        console.error(`Error tagging ${video}:`, err);
-                        socket.emit('tagging-log', { message: `Error: ${err.message}`, type: 'error' });
+                    const files = fs.readdirSync(dir.path);
+                    const videos = files.filter(file => {
+                        const ext = path.extname(file).toLowerCase();
+                        return ['.mp4', '.webm', '.ogg', '.mov', '.mkv', '.m4v', '.avi'].includes(ext);
+                    }).map(file => {
+                        return { dirId: dir.id, filename: file, path: path.join(dir.path, file) };
+                    });
+                    allVideos = allVideos.concat(videos);
+                }
+                socket.emit('tagging-log', { message: `Found ${allVideos.length} videos.`, type: 'info' });
+                const { getModelsPerServer } = require('../services/ollamaService');
+                const servers = await getModelsPerServer();
+                let concurrency = 0;
+                for (const server of servers) {
+                    const epId = server.endpoint.id;
+                    if (modelMap[epId] && modelMap[epId] !== 'skip') {
+                        concurrency += server.endpoint.weight;
                     }
                 }
+                if (concurrency < 1)
+                    concurrency = 1;
+                let index = 0;
+                const blacklist = getBlacklist();
+                async function worker() {
+                    while (index < allVideos.length && socket.isTagging) {
+                        const videoObj = allVideos[index++];
+                        const meta = await store.get(videoObj.filename);
+                        if (meta.tags && meta.tags.length > 0) {
+                            continue;
+                        }
+                        socket.emit('tagging-log', { message: `Analysing: ${videoObj.filename.slice(0, 25)}...`, type: 'info' });
+                        const baseName = path.basename(videoObj.filename, path.extname(videoObj.filename));
+                        const prompt = "Generate 5-8 relevant, concise keywords/tags based on the filename. Return ONLY tags, comma-separated. No sentences.";
+                        try {
+                            const response = await generateTagsFromText(modelMap, baseName, prompt, socket.abortController.signal, (msg, type) => {
+                                if (socket.isTagging) {
+                                    socket.emit('tagging-log', { message: msg, type });
+                                }
+                            });
+                            let rawTags = response.split(/,|;|\n/).map(t => t.trim()).filter(t => t.length > 0);
+                            rawTags = rawTags.filter(t => !blacklist.includes(t.toLowerCase()));
+                            const tags = rawTags.filter(t => t.length < 30);
+                            if (tags.length > 0) {
+                                await store.update(videoObj.filename, { tags: tags });
+                                socket.emit('tagging-log', { message: `Tagged: ${tags.join(', ')}`, type: 'success' });
+                            }
+                            else {
+                                socket.emit('tagging-log', { message: `No tags generated.`, type: 'warning' });
+                            }
+                            await new Promise(resolve => setTimeout(resolve, 1000));
+                        }
+                        catch (err) {
+                            if (err.message === 'Aborted' || err.name === 'AbortError') {
+                                socket.emit('tagging-log', { message: 'Tagging stopped.', type: 'warning' });
+                                break;
+                            }
+                            console.error(`Error tagging ${videoObj.filename}:`, err);
+                            socket.emit('tagging-log', { message: `Error: ${err.message}`, type: 'error' });
+                        }
+                    }
+                }
+                const workers = [];
+                for (let i = 0; i < concurrency; i++) {
+                    workers.push(worker());
+                }
+                await Promise.all(workers);
                 if (socket.isTagging) {
                     socket.emit('tagging-log', { message: 'Process complete!', type: 'success' });
                     socket.emit('tagging-complete');
@@ -109,6 +152,47 @@ module.exports = (io) => {
                 socket.isTagging = false;
                 socket.emit('tagging-status', { isTagging: false });
                 socket.abortController = null;
+            }
+        }
+        socket.on('start-tagging-confirmed', async (data) => {
+            if (socket.isTagging)
+                return;
+            await runTagging(data.modelMap, socket, data);
+        });
+        socket.on('start-tagging', async (data) => {
+            if (socket.isTagging) {
+                socket.emit('tagging-log', { message: 'Tagging already in progress.', type: 'warning' });
+                return;
+            }
+            const { model } = data || {};
+            const settings = await getOllamaSettings();
+            const modelName = model || settings.tagModel || 'llama3';
+            console.log(`Checking models for auto-tagging with default model: ${modelName}`);
+            try {
+                const { getModelsPerServer } = require('../services/ollamaService');
+                const servers = await getModelsPerServer();
+                const mismatchServers = [];
+                const modelMap = {};
+                for (const server of servers) {
+                    const hasModel = server.models.some(m => m.name === modelName);
+                    if (!hasModel) {
+                        mismatchServers.push(server);
+                    }
+                    modelMap[server.endpoint.id] = modelName;
+                }
+                if (mismatchServers.length > 0) {
+                    socket.emit('tagging-model-mismatch', {
+                        servers: mismatchServers,
+                        defaultModel: modelName,
+                        modelMap
+                    });
+                    return;
+                }
+                await runTagging(modelMap, socket, data);
+            }
+            catch (err) {
+                console.error('Error in start-tagging setup:', err);
+                socket.emit('tagging-log', { message: 'Fatal error checking servers.', type: 'error' });
             }
         });
         socket.on('disconnect', () => {
@@ -130,46 +214,47 @@ module.exports = (io) => {
             const { force, previews } = data || {};
             const { generateThumbnail, generatePreview } = require('../services/thumbnailService');
             try {
-                if (!fs.existsSync(VIDEO_DIR)) {
-                    socket.emit('thumbnail-log', { message: 'Video directory not found!', type: 'error' });
+                const userId = getUserIdFromToken(data.token);
+                if (!userId) {
+                    socket.emit('thumbnail-log', { message: 'Unauthorized: Invalid token.', type: 'error' });
                     return;
                 }
-                const files = fs.readdirSync(VIDEO_DIR);
-                const videos = files.filter(file => {
-                    const ext = path.extname(file).toLowerCase();
-                    return ['.mp4', '.webm', '.ogg', '.mov'].includes(ext);
-                });
-                socket.emit('thumbnail-log', { message: `Found ${videos.length} videos.`, type: 'info' });
-                for (const [index, video] of videos.entries()) {
+                const dirs = await getAllowedDirectories(userId);
+                let allVideos = [];
+                for (const dir of dirs) {
+                    if (!fs.existsSync(dir.path))
+                        continue;
+                    const files = fs.readdirSync(dir.path);
+                    const videos = files.filter(file => {
+                        const ext = path.extname(file).toLowerCase();
+                        return ['.mp4', '.webm', '.ogg', '.mov', '.mkv', '.m4v', '.avi'].includes(ext);
+                    }).map(file => {
+                        return { dirId: dir.id, filename: file, path: path.join(dir.path, file) };
+                    });
+                    allVideos = allVideos.concat(videos);
+                }
+                socket.emit('thumbnail-log', { message: `Found ${allVideos.length} videos.`, type: 'info' });
+                for (const [index, videoObj] of allVideos.entries()) {
                     if (!socket.isGeneratingThumbnails)
                         break;
-                    const percent = Math.round(((index + 1) / videos.length) * 100);
+                    const percent = Math.round(((index + 1) / allVideos.length) * 100);
                     socket.emit('thumbnail-progress', percent);
-                    socket.emit('thumbnail-log', { message: `Processing ${video}...`, type: 'info' });
+                    socket.emit('thumbnail-log', { message: `Processing ${videoObj.filename}...`, type: 'info' });
                     try {
-                        // 1. Static Thumbnail
-                        // By default service checks existence. If "force" is true, we might need to delete first or just rely on overwrite if service supports it.
-                        // Impl: create logic to skip if exists and !force
-                        // ... Since we can't easily peek into service, let's just call it. Service currently checks fs.existsSync.
-                        // Ideally we should update service to accept 'force'. 
-                        // For now we will rely on service's check. If user wants FORCE, we should probably delete the file before calling generate.
+                        const combinedName = `${videoObj.dirId}::${videoObj.filename}`;
                         const THUMB_DIR = config.thumbnailsDir;
-                        const videoThumbDir = path.join(THUMB_DIR, video);
+                        const videoThumbDir = path.join(THUMB_DIR, combinedName);
                         const tPath = path.join(videoThumbDir, 'thumbnail.jpg');
                         const pPath = path.join(videoThumbDir, 'preview.jpg');
-                        // Static
-                        // If force, we can just delete the whole folder? Or individual files?
-                        // Service will mkdir if needed.
                         if (force && fs.existsSync(tPath))
                             fs.unlinkSync(tPath);
-                        await generateThumbnail(video);
-                        // Preview
+                        await generateThumbnail(combinedName);
                         if (previews) {
                             if (force && fs.existsSync(pPath))
                                 fs.unlinkSync(pPath);
-                            await generatePreview(video);
+                            await generatePreview(combinedName);
                         }
-                        socket.emit('thumbnail-log', { message: `Generated for ${video}`, type: 'success' });
+                        socket.emit('thumbnail-log', { message: `Generated for ${videoObj.filename}`, type: 'success' });
                     }
                     catch (err) {
                         socket.emit('thumbnail-log', { message: `Error: ${err.message}`, type: 'error' });

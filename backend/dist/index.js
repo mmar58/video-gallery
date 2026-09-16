@@ -64,11 +64,22 @@ const setupVideoGallery = async (app, serverOrIo) => {
     // Ollama models endpoint
     app.get('/api/ollama/models', async (req, res) => {
         try {
+            const { getModels } = require('./services/ollamaService');
             const models = await getModels();
             res.json(models);
         }
         catch (error) {
             res.status(500).json({ error: 'Failed to fetch Ollama models' });
+        }
+    });
+    app.get('/api/ollama/models-per-server', async (req, res) => {
+        try {
+            const { getModelsPerServer } = require('./services/ollamaService');
+            const models = await getModelsPerServer();
+            res.json(models);
+        }
+        catch (error) {
+            res.status(500).json({ error: 'Failed to fetch Ollama models per server' });
         }
     });
     app.get('/api/gallery-status', (req, res) => {

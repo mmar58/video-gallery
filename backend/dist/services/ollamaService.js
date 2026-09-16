@@ -89,8 +89,8 @@ class OllamaPool {
         });
         this.processQueue();
     }
-    getAvailableEndpoint() {
-        const activeEndpoints = this.endpoints.filter(ep => ep.active);
+    getAvailableEndpoint(allowedEndpointIds = null) {
+        const activeEndpoints = this.endpoints.filter(ep => ep.active && (!allowedEndpointIds || allowedEndpointIds.includes(ep.id)));
         if (activeEndpoints.length === 0) {
             return null;
         }
@@ -114,22 +114,32 @@ class OllamaPool {
     processQueue() {
         if (this.queue.length === 0)
             return;
-        const ep = this.getAvailableEndpoint();
-        if (ep) {
-            const item = this.queue.shift();
-            this.executeTaskOnEndpoint(item, ep);
+        for (let i = 0; i < this.queue.length; i++) {
+            const item = this.queue[i];
+            const ep = this.getAvailableEndpoint(item.allowedEndpointIds);
+            if (ep) {
+                this.queue.splice(i, 1);
+                this.executeTaskOnEndpoint(item, ep);
+                return; // process one at a time, executeTaskOnEndpoint will call processQueue again
+            }
         }
     }
     async executeTaskOnEndpoint(item, ep) {
-        const { taskFn, resolve, reject, retries = 0 } = item;
+        const { taskFn, resolve, reject, retries = 0, logCallback } = item;
         const currentCount = this.activeRequests.get(ep.id) || 0;
         this.activeRequests.set(ep.id, currentCount + 1);
         try {
             const client = this.clients.get(ep.id);
+            if (logCallback)
+                logCallback(`Sending request to ${ep.url} (Attempt ${retries + 1})`, 'info');
             const result = await taskFn(client, ep);
+            if (logCallback)
+                logCallback(`Response from ${ep.url}: Success`, 'success');
             resolve(result);
         }
         catch (error) {
+            if (logCallback)
+                logCallback(`Response from ${ep.url}: Failed (${error.message})`, 'error');
             console.error(`[OllamaPool] Task failed on endpoint ${ep.url}:`, error.message);
             // Mark endpoint as inactive temporarily in memory to force failover
             console.warn(`[OllamaPool] Temporarily disabling endpoint ${ep.url} due to failure.`);
@@ -151,17 +161,17 @@ class OllamaPool {
             this.processQueue(); // See if more tasks can be run
         }
     }
-    async dispatchTask(taskFn) {
+    async dispatchTask(taskFn, allowedEndpointIds = null, logCallback = null) {
         if (this.endpoints.length === 0) {
             await this.initOrRefresh();
         }
-        const activeEndpoints = this.endpoints.filter(ep => ep.active);
+        const activeEndpoints = this.endpoints.filter(ep => ep.active && (!allowedEndpointIds || allowedEndpointIds.includes(ep.id)));
         if (activeEndpoints.length === 0) {
-            throw new Error('No active Ollama endpoints available. Please check settings.');
+            throw new Error('No active Ollama endpoints available for this task. Please check settings.');
         }
         return new Promise((resolve, reject) => {
-            const item = { taskFn, resolve, reject, timestamp: Date.now(), retries: 0 };
-            const ep = this.getAvailableEndpoint();
+            const item = { taskFn, resolve, reject, timestamp: Date.now(), retries: 0, allowedEndpointIds, logCallback };
+            const ep = this.getAvailableEndpoint(allowedEndpointIds);
             if (ep) {
                 this.executeTaskOnEndpoint(item, ep);
             }
@@ -179,31 +189,59 @@ class OllamaPool {
             return response.models;
         });
     }
-    async generateTagsFromText(modelName, text, prompt = "Generate 5-10 relevant keywords or tags based on this text. Comma separated, no intro.", signal) {
-        return this.dispatchTask(async (client) => {
+    async getModelsPerServer() {
+        if (this.endpoints.length === 0) {
+            await this.initOrRefresh();
+        }
+        const results = await Promise.all(this.endpoints.map(async (ep) => {
+            try {
+                const client = this.clients.get(ep.id);
+                const response = await client.list();
+                return { endpoint: ep, models: response.models, status: 'online' };
+            }
+            catch (err) {
+                return { endpoint: ep, models: [], status: 'offline' };
+            }
+        }));
+        return results;
+    }
+    async generateTagsFromText(modelMap, text, prompt = "Generate 5-10 relevant keywords or tags based on this text. Comma separated, no intro.", signal, logCallback = null) {
+        const isMap = typeof modelMap === 'object';
+        const allowedEndpointIds = isMap
+            ? Object.keys(modelMap).filter(id => modelMap[id] && modelMap[id] !== 'skip')
+            : null;
+        return this.dispatchTask(async (client, ep) => {
+            const modelName = isMap ? modelMap[ep.id] : modelMap;
             const timeoutMs = 45000;
-            const generatePromise = client.generate({
-                model: modelName,
-                prompt: `${prompt}\n\nText: ${text}`
-            });
-            const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Ollama generation timed out')), timeoutMs));
-            if (signal) {
-                if (signal.aborted)
-                    throw new Error('Aborted');
-                const abortPromise = new Promise((_, reject) => {
-                    signal.addEventListener('abort', () => reject(new Error('Aborted')));
+            let timeoutId;
+            try {
+                const generatePromise = client.generate({
+                    model: modelName,
+                    prompt: `${prompt}\n\nText: ${text}`
                 });
-                const response = await Promise.race([generatePromise, timeoutPromise, abortPromise]);
+                const timeoutPromise = new Promise((_, reject) => timeoutId = setTimeout(() => reject(new Error('Ollama generation timed out')), timeoutMs));
+                if (signal) {
+                    if (signal.aborted)
+                        throw new Error('Aborted');
+                    const abortPromise = new Promise((_, reject) => {
+                        signal.addEventListener('abort', () => reject(new Error('Aborted')));
+                    });
+                    const response = await Promise.race([generatePromise, timeoutPromise, abortPromise]);
+                    return response.response;
+                }
+                const response = await Promise.race([generatePromise, timeoutPromise]);
                 return response.response;
             }
-            const response = await Promise.race([generatePromise, timeoutPromise]);
-            return response.response;
-        });
+            finally {
+                clearTimeout(timeoutId);
+            }
+        }, allowedEndpointIds, logCallback);
     }
 }
 const pool = new OllamaPool();
 module.exports = {
     getModels: () => pool.getModels(),
-    generateTagsFromText: (m, t, p, s) => pool.generateTagsFromText(m, t, p, s),
+    getModelsPerServer: () => pool.getModelsPerServer(),
+    generateTagsFromText: (m, t, p, s, logCb) => pool.generateTagsFromText(m, t, p, s, logCb),
     refreshPool: () => pool.initOrRefresh()
 };

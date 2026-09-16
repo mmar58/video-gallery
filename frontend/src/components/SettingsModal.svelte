@@ -23,8 +23,33 @@
     let lowBandwidth = false;
 
     let endpoints = [];
+    let endpointStatuses = {};
     let newEndpointUrl = "";
     let newEndpointWeight = 1;
+
+    async function checkEndpointStatuses() {
+        const newStatuses = { ...endpointStatuses };
+        endpoints.forEach(ep => {
+            newStatuses[ep.id] = 'checking';
+        });
+        endpointStatuses = newStatuses;
+
+        try {
+            const results = await api.getModelsPerServer();
+            const updatedStatuses = { ...endpointStatuses };
+            results.forEach(res => {
+                updatedStatuses[res.endpoint.id] = res.status;
+            });
+            endpointStatuses = updatedStatuses;
+        } catch (e) {
+            console.error("Failed to check endpoints:", e);
+            const failedStatuses = { ...endpointStatuses };
+            endpoints.forEach(ep => {
+                failedStatuses[ep.id] = 'offline';
+            });
+            endpointStatuses = failedStatuses;
+        }
+    }
 
     async function load() {
         console.log("[settings-debug] modal: load() start");
@@ -69,6 +94,7 @@
         } finally {
             loading = false;
             console.log("[settings-debug] modal: load() end");
+            checkEndpointStatuses();
         }
     }
 
@@ -149,14 +175,16 @@
 
     function handleAddEndpoint() {
         if (!newEndpointUrl) return;
+        const newId = 'ep_' + Date.now();
         endpoints = [...endpoints, {
-            id: 'ep_' + Date.now(),
+            id: newId,
             url: newEndpointUrl,
             weight: newEndpointWeight || 1,
             active: true
         }];
         newEndpointUrl = "";
         newEndpointWeight = 1;
+        checkEndpointStatuses();
     }
 
     function handleRemoveEndpoint(id) {
@@ -242,7 +270,16 @@
                         {#each endpoints as ep (ep.id)}
                             <div class="flex items-center justify-between p-3 rounded-lg border border-gray-700 bg-gray-900/50">
                                 <div class="flex-1 overflow-hidden mr-3">
-                                    <div class="text-sm font-medium text-gray-200 truncate" title={ep.url}>{ep.url}</div>
+                                    <div class="text-sm font-medium text-gray-200 truncate flex items-center gap-2" title={ep.url}>
+                                        {ep.url}
+                                        {#if endpointStatuses[ep.id] === 'checking'}
+                                            <Loader2 class="animate-spin text-gray-400" size={14} />
+                                        {:else if endpointStatuses[ep.id] === 'online'}
+                                            <span class="w-2 h-2 rounded-full bg-green-500" title="Online"></span>
+                                        {:else if endpointStatuses[ep.id] === 'offline'}
+                                            <span class="w-2 h-2 rounded-full bg-red-500" title="Offline"></span>
+                                        {/if}
+                                    </div>
                                     <div class="text-xs text-gray-500">Weight (Concurrency): {ep.weight}</div>
                                 </div>
                                 <div class="flex items-center gap-3">

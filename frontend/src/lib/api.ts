@@ -147,6 +147,16 @@ export const api = {
         return data;
     },
 
+    async getModelsPerServer(): Promise<any> {
+        const baseUrl = API_URL.replace('/api/videos', '');
+        console.log('[settings-debug] api: getModelsPerServer request', `${baseUrl}/api/ollama/models-per-server`);
+        const res = await fetchWithAuth(`${baseUrl}/api/ollama/models-per-server`);
+        if (!res.ok) throw new Error('Failed to fetch Ollama models per server');
+        const data = await res.json();
+        console.log('[settings-debug] api: getModelsPerServer success count', Array.isArray(data) ? data.length : 0);
+        return data;
+    },
+
     async uploadVideo(formData: FormData, onProgress?: (percent: number) => void): Promise<any> {
         const baseUrl = API_URL.replace('/api/videos', '');
         return new Promise((resolve, reject) => {
