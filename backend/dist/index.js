@@ -95,8 +95,8 @@ const setupVideoGallery = async (app, serverOrIo) => {
     // Initialize Socket.IO
     socketHandler(io);
     // Start background workers
-    const { startCleanerWorker } = require('./services/cleanerService');
-    startCleanerWorker();
+    const { startScanner } = require('./services/scannerService');
+    startScanner();
     return { app, io };
 };
 // Standalone Execution

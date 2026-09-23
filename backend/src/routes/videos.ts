@@ -43,97 +43,111 @@ router.get('/', async (req: AuthRequest, res) => {
     try {
         const userId = req.user.id;
         const allowedDirs = await getAllowedDirectories(userId);
-        let allVideos: any[] = [];
+        const allowedDirIds = allowedDirs.map(d => d.id);
         
-        for (const dir of allowedDirs) {
-            if (!fs.existsSync(dir.path)) continue; // skip missing dirs, UI will handle scan-missing
-            
-            const files = fs.readdirSync(dir.path);
-            
-            const videos = await Promise.all(files
-                .filter(file => {
-                    const ext = path.extname(file).toLowerCase();
-                    return ['.mp4', '.webm', '.ogg', '.mov', '.mkv', '.m4v', '.avi'].includes(ext);
-                })
-                .map(async file => {
-                    const filePath = path.join(dir.path, file);
-                    const stats = fs.statSync(filePath);
-                    const meta = await store.get(file); 
-                    
-                    return {
-                        name: `${dir.id}::${file}`,
-                        displayName: file, // Added for frontend UI
-                        path: filePath,
-                        size: stats.size,
-                        created: stats.birthtime,
-                        updated: stats.mtime,
-                        likes: meta.likes,
-                        tags: meta.tags,
-                        hideUntil: (meta as any).hideUntil // typing workaround
-                    };
-                }));
-                
-            allVideos = allVideos.concat(videos);
+        if (allowedDirIds.length === 0) {
+            return res.json({ videos: [], pagination: { page: 1, limit: 12, total: 0, totalPages: 0 } });
         }
 
-        let videos = allVideos;
-
-        // Search
         const { search, tag, sort, days, dateFrom, dateTo, hidden } = req.query as any;
+        const page = parseInt(req.query.page as string) || 1;
+        const limit = parseInt(req.query.limit as string) || 12;
+        const nowMs = Date.now();
+
+        // Base Query
+        let query = db('videos')
+            .whereIn('directory_id', allowedDirIds)
+            .select('videos.*');
+
+        // Search Filter
         if (search) {
-            const lowerSearch = search.toLowerCase();
-            videos = videos.filter(v => v.displayName.toLowerCase().includes(lowerSearch) || v.tags.some((t: string) => t.toLowerCase().includes(lowerSearch)));
+            const lowerSearch = `%${search.toLowerCase()}%`;
+            query = query.where(function() {
+                this.whereRaw('LOWER(videos.filename) LIKE ?', [lowerSearch])
+                    .orWhereIn('videos.id', db('video_tags')
+                        .join('tags', 'video_tags.tag_id', 'tags.id')
+                        .whereRaw('LOWER(tags.name) LIKE ?', [lowerSearch])
+                        .select('video_tags.video_id'));
+            });
         }
+
+        // Tag Filter
         if (tag) {
-            videos = videos.filter(v => v.tags.includes(tag));
+            query = query.whereIn('videos.id', db('video_tags')
+                .join('tags', 'video_tags.tag_id', 'tags.id')
+                .where('tags.name', tag)
+                .select('video_tags.video_id'));
         }
 
         // Hidden Filter
-        const nowMs = Date.now();
         if (hidden === 'true') {
-            videos = videos.filter(v => v.hideUntil && v.hideUntil > nowMs);
+            query = query.where('videos.hide_until', '>', nowMs);
         } else {
-            videos = videos.filter(v => !v.hideUntil || v.hideUntil <= nowMs);
+            query = query.where(function() {
+                this.whereNull('videos.hide_until').orWhere('videos.hide_until', '<=', nowMs);
+            });
         }
 
         // Date Filtering
         if (days) {
-            const now = new Date();
             const past = new Date();
-            past.setDate(now.getDate() - parseInt(days));
-            videos = videos.filter(v => v.created >= past);
+            past.setDate(past.getDate() - parseInt(days));
+            query = query.where('videos.file_created_at', '>=', past);
         } else if (dateFrom || dateTo) {
-            if (dateFrom) {
-                const from = new Date(dateFrom);
-                videos = videos.filter(v => v.created >= from);
-            }
+            if (dateFrom) query = query.where('videos.file_created_at', '>=', new Date(dateFrom));
             if (dateTo) {
                 const to = new Date(dateTo);
                 to.setHours(23, 59, 59, 999);
-                videos = videos.filter(v => v.created <= to);
+                query = query.where('videos.file_created_at', '<=', to);
             }
         }
 
+        // We need a count for pagination before applying sort and limit
+        const [{ total: totalRows }] = await query.clone().clearSelect().count('* as total');
+        const total = typeof totalRows === 'string' ? parseInt(totalRows) : totalRows;
+
         // Sort
         if (sort === 'likes') {
-            videos.sort((a, b) => b.likes - a.likes);
+            query = query.orderBy('videos.likes', 'desc');
         } else if (sort === 'random') {
-            videos.sort(() => Math.random() - 0.5);
+            query = query.orderByRaw('RANDOM()');
         } else if (sort === 'date') {
-            videos.sort((a, b) => b.created.getTime() - a.created.getTime());
+            query = query.orderBy('videos.file_created_at', 'desc');
         } else {
-            videos.sort((a, b) => a.displayName.localeCompare(b.displayName));
+            query = query.orderBy('videos.filename', 'asc');
         }
 
         // Pagination
-        const page = parseInt(req.query.page as string) || 1;
-        const limit = parseInt(req.query.limit as string) || 12;
-        const total = videos.length;
         const totalPages = Math.ceil(total / limit);
-        const startIndex = (page - 1) * limit;
-        const endIndex = page * limit;
+        const offset = (page - 1) * limit;
+        const results = await query.limit(limit).offset(offset);
 
-        const paginatedVideos = videos.slice(startIndex, endIndex);
+        // Fetch tags for the results
+        const videoIds = results.map((v: any) => v.id);
+        let tagsMap: Record<number, string[]> = {};
+        if (videoIds.length > 0) {
+            const tagsRows = await db('video_tags')
+                .join('tags', 'video_tags.tag_id', 'tags.id')
+                .whereIn('video_tags.video_id', videoIds)
+                .select('video_tags.video_id', 'tags.name');
+            for (const row of tagsRows) {
+                if (!tagsMap[row.video_id]) tagsMap[row.video_id] = [];
+                tagsMap[row.video_id].push(row.name);
+            }
+        }
+
+        // Format to match frontend structure
+        const paginatedVideos = results.map((v: any) => ({
+            name: `${v.directory_id}::${v.filename}`,
+            displayName: v.filename,
+            path: '', 
+            size: v.size || 0,
+            created: v.file_created_at ? new Date(v.file_created_at) : new Date(),
+            updated: v.file_updated_at ? new Date(v.file_updated_at) : new Date(),
+            likes: v.likes,
+            tags: tagsMap[v.id] || [],
+            hideUntil: v.hide_until
+        }));
 
         res.json({
             videos: paginatedVideos,
@@ -150,33 +164,30 @@ router.get('/stats', async (req: AuthRequest, res) => {
     try {
         const userId = req.user.id;
         const allowedDirs = await getAllowedDirectories(userId);
+        const allowedDirIds = allowedDirs.map(d => d.id);
+        
+        if (allowedDirIds.length === 0) {
+            return res.json({ distributions: {}, minDate: new Date(), maxDate: new Date(), totalVideos: 0 });
+        }
+
+        const videos = await db('videos')
+            .whereIn('directory_id', allowedDirIds)
+            .whereNotNull('file_created_at')
+            .select('file_created_at');
+
         const months: Record<string, number> = {};
         let minDate: Date | null = null;
         let maxDate: Date | null = null;
-        let totalVideos = 0;
-        
-        for (const dir of allowedDirs) {
-            if (!fs.existsSync(dir.path)) continue;
-            
-            const files = fs.readdirSync(dir.path);
-            const videoFiles = files.filter(file => {
-                const ext = path.extname(file).toLowerCase();
-                return ['.mp4', '.webm', '.ogg', '.mov', '.mkv', '.m4v', '.avi'].includes(ext);
-            });
-            
-            for (const file of videoFiles) {
-                const filePath = path.join(dir.path, file);
-                const stats = fs.statSync(filePath);
-                const date = stats.birthtime;
-                const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-                
-                months[key] = (months[key] || 0) + 1;
-                if (!minDate || date < minDate) minDate = date;
-                if (!maxDate || date > maxDate) maxDate = date;
-                totalVideos++;
-            }
+        let totalVideos = videos.length;
+
+        for (const v of videos) {
+            const date = new Date(v.file_created_at);
+            const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+            months[key] = (months[key] || 0) + 1;
+            if (!minDate || date < minDate) minDate = date;
+            if (!maxDate || date > maxDate) maxDate = date;
         }
-        
+
         res.json({
             distributions: months,
             minDate: minDate || new Date(),
@@ -239,22 +250,22 @@ router.get('/:filename/stream', async (req: AuthRequest, res) => {
 // Ideally, store.js should be refactored to use directory_id + filename.
 
 router.post('/:filename/like', async (req, res) => {
-    const { filename } = parseFilename(req.params.filename);
-    const currentMeta = await store.get(filename);
-    const meta = await store.update(filename, {
+    const { dirId, filename } = parseFilename(req.params.filename);
+    const currentMeta = await store.get(dirId, filename);
+    const meta = await store.update(dirId, filename, {
         likes: (currentMeta.likes || 0) + 1
     });
     res.json(meta);
 });
 
 router.post('/:filename/hide', async (req, res) => {
-    const { filename } = parseFilename(req.params.filename);
+    const { dirId, filename } = parseFilename(req.params.filename);
     const { days } = req.body;
     let hideUntil = null;
     if (days && typeof days === 'number' && days > 0) {
         hideUntil = Date.now() + days * 24 * 60 * 60 * 1000;
     }
-    const meta = await store.update(filename, { hideUntil });
+    const meta = await store.update(dirId, filename, { hideUntil });
     res.json(meta);
 });
 
@@ -275,7 +286,7 @@ router.put('/:filename', async (req: AuthRequest, res) => {
 
     fs.rename(oldPath, newPath, (err) => {
         if (err) return res.status(500).json({ error: 'Rename failed' });
-        store.rename(oldName, newName);
+        store.rename(dirId, oldName, newName);
         res.json({ success: true, newName: `${dirId}::${newName}` });
     });
 });
@@ -294,7 +305,7 @@ router.delete('/:filename', async (req: AuthRequest, res) => {
 
     fs.unlink(filePath, (err) => {
         if (err) return res.status(500).json({ error: 'Delete failed' });
-        store.delete(filename);
+        store.delete(dirId, filename);
         deleteThumbnail(req.params.filename as string); // passing full name as thumbnail service uses it? We'll have to adapt thumbnailService
         res.json({ success: true });
     });
@@ -311,15 +322,15 @@ router.get('/tags', async (req, res) => {
 });
 
 router.post('/:filename/tags', async (req, res) => {
-    const { filename } = parseFilename(req.params.filename);
+    const { dirId, filename } = parseFilename(req.params.filename);
     const { tag } = req.body;
     if (!tag) return res.status(400).json({ error: 'Tag is required' });
 
-    const currentData = await store.get(filename);
+    const currentData = await store.get(dirId, filename);
     const currentTags = currentData.tags || [];
 
     if (!currentTags.includes(tag)) {
-        const meta = await store.update(filename, { tags: [...currentTags, tag] });
+        const meta = await store.update(dirId, filename, { tags: [...currentTags, tag] });
         res.json(meta);
     } else {
         res.json(currentData);
@@ -327,13 +338,13 @@ router.post('/:filename/tags', async (req, res) => {
 });
 
 router.delete('/:filename/tags/:tag', async (req, res) => {
-    const { filename } = parseFilename(req.params.filename);
+    const { dirId, filename } = parseFilename(req.params.filename);
     const { tag } = req.params;
-    const currentData = await store.get(filename);
+    const currentData = await store.get(dirId, filename);
     const currentTags = currentData.tags || [];
 
     const newTags = currentTags.filter((t: string) => t !== tag);
-    const meta = await store.update(filename, { tags: newTags });
+    const meta = await store.update(dirId, filename, { tags: newTags });
     res.json(meta);
 });
 

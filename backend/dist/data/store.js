@@ -8,38 +8,42 @@ module.exports = {
             .select('video_tags.video_id', 'tags.name');
         const metadata = {};
         for (const v of videos) {
-            metadata[v.filename] = { likes: v.likes, tags: [] };
+            const key = v.directory_id ? `${v.directory_id}::${v.filename}` : v.filename;
+            metadata[key] = { likes: v.likes, tags: [], hideUntil: v.hide_until };
         }
         for (const vt of videoTags) {
             const v = videos.find(v => v.id === vt.video_id);
-            if (v && metadata[v.filename]) {
-                metadata[v.filename].tags.push(vt.name);
+            if (v) {
+                const key = v.directory_id ? `${v.directory_id}::${v.filename}` : v.filename;
+                if (metadata[key]) {
+                    metadata[key].tags.push(vt.name);
+                }
             }
         }
         return metadata;
     },
-    get: async (filename) => {
-        const video = await db('videos').where({ filename }).first();
+    get: async (directoryId, filename) => {
+        const video = await db('videos').where({ directory_id: directoryId, filename }).first();
         if (!video)
-            return { likes: 0, tags: [] };
+            return { likes: 0, tags: [], hideUntil: null };
         const tags = await db('video_tags')
             .join('tags', 'video_tags.tag_id', 'tags.id')
             .where('video_tags.video_id', video.id)
             .select('tags.name');
-        return { likes: video.likes, tags: tags.map(t => t.name) };
+        return { likes: video.likes, tags: tags.map(t => t.name), hideUntil: video.hide_until };
     },
-    add: async (filename) => {
-        let video = await db('videos').where({ filename }).first();
+    add: async (directoryId, filename) => {
+        let video = await db('videos').where({ directory_id: directoryId, filename }).first();
         if (!video) {
-            const [newVideo] = await db('videos').insert({ filename, likes: 0 }).returning('*');
+            const [newVideo] = await db('videos').insert({ directory_id: directoryId, filename, likes: 0 }).returning('*');
             video = newVideo;
         }
-        return { likes: video.likes, tags: [] };
+        return { likes: video.likes, tags: [], hideUntil: video.hide_until };
     },
-    update: async (filename, updates) => {
-        let video = await db('videos').where({ filename }).first();
+    update: async (directoryId, filename, updates) => {
+        let video = await db('videos').where({ directory_id: directoryId, filename }).first();
         if (!video) {
-            const [newVideo] = await db('videos').insert({ filename, likes: 0 }).returning('*');
+            const [newVideo] = await db('videos').insert({ directory_id: directoryId, filename, likes: 0 }).returning('*');
             video = newVideo;
         }
         if (updates.likes !== undefined) {
@@ -59,17 +63,21 @@ module.exports = {
                 await db('video_tags').insert({ video_id: video.id, tag_id: tag.id }).onConflict(['video_id', 'tag_id']).ignore();
             }
         }
+        if (updates.hideUntil !== undefined) {
+            await db('videos').where({ id: video.id }).update({ hide_until: updates.hideUntil });
+            video.hide_until = updates.hideUntil;
+        }
         const tags = await db('video_tags')
             .join('tags', 'video_tags.tag_id', 'tags.id')
             .where('video_tags.video_id', video.id)
             .select('tags.name');
-        return { likes: video.likes, tags: tags.map(t => t.name) };
+        return { likes: video.likes, tags: tags.map(t => t.name), hideUntil: video.hide_until };
     },
-    rename: async (oldName, newName) => {
-        await db('videos').where({ filename: oldName }).update({ filename: newName });
+    rename: async (directoryId, oldName, newName) => {
+        await db('videos').where({ directory_id: directoryId, filename: oldName }).update({ filename: newName });
     },
-    delete: async (filename) => {
-        await db('videos').where({ filename }).delete();
+    delete: async (directoryId, filename) => {
+        await db('videos').where({ directory_id: directoryId, filename }).delete();
     },
     removeTagFromAll: async (tagToRemove) => {
         const lowerTag = tagToRemove.toLowerCase();
