@@ -39,6 +39,9 @@ const parseFilename = (combined: string) => {
 };
 
 // GET /api/videos - List all videos
+// This endpoint is the core of the video gallery. It fetches paginated video metadata
+// from the SQLite database, applies dynamic filters (search, tags, dates, hidden status),
+// and joins the video tags for the final response.
 router.get('/', async (req: AuthRequest, res) => {
     try {
         const userId = req.user.id;
@@ -46,6 +49,7 @@ router.get('/', async (req: AuthRequest, res) => {
         const allowedDirIds = allowedDirs.map(d => d.id);
         
         if (allowedDirIds.length === 0) {
+            // Early return if user has no directories allowed, saving DB processing time.
             return res.json({ videos: [], pagination: { page: 1, limit: 12, total: 0, totalPages: 0 } });
         }
 
@@ -54,12 +58,12 @@ router.get('/', async (req: AuthRequest, res) => {
         const limit = parseInt(req.query.limit as string) || 12;
         const nowMs = Date.now();
 
-        // Base Query
+        // Base Query: Establish a secure boundary to only search within directories the user has permission to view.
         let query = db('videos')
             .whereIn('directory_id', allowedDirIds)
             .select('videos.*');
 
-        // Search Filter
+        // Search Filter: Searches by partial filename match OR by matching a tag associated with the video.
         if (search) {
             const lowerSearch = `%${search.toLowerCase()}%`;
             query = query.where(function() {
@@ -71,7 +75,7 @@ router.get('/', async (req: AuthRequest, res) => {
             });
         }
 
-        // Tag Filter
+        // Tag Filter: Uses a subquery to restrict results to videos that possess the exact provided tag.
         if (tag) {
             query = query.whereIn('videos.id', db('video_tags')
                 .join('tags', 'video_tags.tag_id', 'tags.id')
@@ -102,7 +106,8 @@ router.get('/', async (req: AuthRequest, res) => {
             }
         }
 
-        // We need a count for pagination before applying sort and limit
+        // Total Count: Clone the complex query builder (without selections) to get the absolute 
+        // total number of matching rows across all pages. This is required for frontend pagination.
         const [{ total: totalRows }] = await query.clone().clearSelect().count('* as total');
         const total = typeof totalRows === 'string' ? parseInt(totalRows) : totalRows;
 
@@ -122,7 +127,8 @@ router.get('/', async (req: AuthRequest, res) => {
         const offset = (page - 1) * limit;
         const results = await query.limit(limit).offset(offset);
 
-        // Fetch tags for the results
+        // Tag Hydration: To avoid complex JOINs that duplicate row data, we fetch the tags 
+        // specifically for the paginated subset of videos that we just retrieved.
         const videoIds = results.map((v: any) => v.id);
         let tagsMap: Record<number, string[]> = {};
         if (videoIds.length > 0) {
@@ -136,14 +142,17 @@ router.get('/', async (req: AuthRequest, res) => {
             }
         }
 
-        // Format to match frontend structure
+        // Format Response: The frontend expects a specific structure.
+        // We combine directory_id and filename (e.g., '1::video.mp4') as a unique string identifier.
+        const dirMap = new Map(allowedDirs.map(d => [d.id, d.path]));
         const paginatedVideos = results.map((v: any) => ({
             name: `${v.directory_id}::${v.filename}`,
             displayName: v.filename,
-            path: '', 
+            path: dirMap.has(v.directory_id) ? path.join(dirMap.get(v.directory_id) || '', v.filename) : '', 
             size: v.size || 0,
             created: v.file_created_at ? new Date(v.file_created_at) : new Date(),
             updated: v.file_updated_at ? new Date(v.file_updated_at) : new Date(),
+            lastViewTime: v.last_view_time ? new Date(v.last_view_time) : null,
             likes: v.likes,
             tags: tagsMap[v.id] || [],
             hideUntil: v.hide_until
@@ -248,6 +257,13 @@ router.get('/:filename/stream', async (req: AuthRequest, res) => {
 
 // For metadata endpoints, we use the original filename for now to keep store.js working seamlessly.
 // Ideally, store.js should be refactored to use directory_id + filename.
+
+router.post('/:filename/view', async (req, res) => {
+    const { dirId, filename } = parseFilename(req.params.filename);
+    const now = new Date();
+    await db('videos').where({ directory_id: dirId, filename }).update({ last_view_time: now });
+    res.json({ lastViewTime: now });
+});
 
 router.post('/:filename/like', async (req, res) => {
     const { dirId, filename } = parseFilename(req.params.filename);

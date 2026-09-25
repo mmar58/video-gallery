@@ -214,6 +214,11 @@ export const api = {
         return await res.json();
     },
 
+    async recordView(filename: string): Promise<any> {
+        const res = await fetchWithAuth(`${API_URL}/${filename}/view`, { method: 'POST' });
+        return await res.json();
+    },
+
     async hideVideo(filename: string, days: number | string): Promise<any> {
         const res = await fetchWithAuth(`${API_URL}/${filename}/hide`, {
             method: 'POST',

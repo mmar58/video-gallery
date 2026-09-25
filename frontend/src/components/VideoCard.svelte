@@ -35,6 +35,35 @@
 
     let pauseTimeout: any;
 
+    function timeAgo(dateString: string | null | Date): string {
+        if (!dateString) return "Never";
+        const date = new Date(dateString);
+        const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000);
+        let interval = seconds / 31536000;
+        if (interval > 1) return Math.floor(interval) + "y ago";
+        interval = seconds / 2592000;
+        if (interval > 1) return Math.floor(interval) + "mo ago";
+        interval = seconds / 86400;
+        if (interval > 1) return Math.floor(interval) + "d ago";
+        interval = seconds / 3600;
+        if (interval > 1) return Math.floor(interval) + "h ago";
+        interval = seconds / 60;
+        if (interval > 1) return Math.floor(interval) + "m ago";
+        return Math.floor(seconds) + "s ago";
+    }
+
+    let viewRecorded = false;
+    function recordViewIfNew() {
+        if (!viewRecorded) {
+            viewRecorded = true;
+            api.recordView(video.name).then(res => {
+                if (res.lastViewTime) {
+                    video.lastViewTime = res.lastViewTime;
+                }
+            }).catch(() => {});
+        }
+    }
+
     function handleMouseEnter() {
         isHovering = true;
         if (pauseTimeout) clearTimeout(pauseTimeout);
@@ -44,6 +73,7 @@
             playTimeout = setTimeout(() => {
                 if (videoRef && videoRef.paused) {
                     videoRef.play().catch(() => {});
+                    recordViewIfNew();
                 }
             }, 200);
         } else if (hoverMode === "preview") {
@@ -226,6 +256,21 @@
 >
     <!-- Video Preview / Thumbnail -->
     <div class="aspect-video bg-black relative overflow-hidden">
+        
+        <!-- Top Info Bar (Overlay) -->
+        <div
+            class="absolute top-0 left-0 right-0 p-2 bg-gradient-to-b from-black/90 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-30 flex flex-col gap-0.5"
+        >
+            <div class="text-[0.65rem] font-medium text-gray-300 flex justify-between">
+                <span>Created: {timeAgo(video.created)}</span>
+                <span>Viewed: {video.lastViewTime ? timeAgo(video.lastViewTime) : 'Never'}</span>
+            </div>
+            {#if video.lastViewTime}
+                <div class="text-[0.55rem] text-gray-400">
+                    Last view: {new Date(video.lastViewTime).toLocaleString()}
+                </div>
+            {/if}
+        </div>
         <!-- Mode: Preview (Sprite Sheet) -->
         {#if processPreview}
             <div
@@ -290,7 +335,7 @@
         {#if selectionMode}
             <!-- svelte-ignore a11y-click-events-have-key-events -->
             <div
-                class="absolute top-2 left-2 z-20"
+                class="absolute top-10 left-2 z-40"
                 on:click={handleCheckboxClick}
             >
                 <div
@@ -318,7 +363,7 @@
 
         <!-- Actions Overlay -->
         <div
-            class="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-10 flex-wrap justify-end max-w-[80%]"
+            class="absolute top-10 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-40 flex-wrap justify-end max-w-[80%]"
         >
             <button
                 on:click={handleLike}
