@@ -38,7 +38,9 @@
     function timeAgo(dateString: string | null | Date): string {
         if (!dateString) return "Never";
         const date = new Date(dateString);
-        const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000);
+        const seconds = Math.floor(
+            (new Date().getTime() - date.getTime()) / 1000,
+        );
         let interval = seconds / 31536000;
         if (interval > 1) return Math.floor(interval) + "y ago";
         interval = seconds / 2592000;
@@ -56,11 +58,13 @@
     function recordViewIfNew() {
         if (!viewRecorded) {
             viewRecorded = true;
-            api.recordView(video.name).then(res => {
-                if (res.lastViewTime) {
-                    video.lastViewTime = res.lastViewTime;
-                }
-            }).catch(() => {});
+            api.recordView(video.name)
+                .then((res) => {
+                    if (res.lastViewTime) {
+                        video.lastViewTime = res.lastViewTime;
+                    }
+                })
+                .catch(() => {});
         }
     }
 
@@ -251,26 +255,35 @@
     on:mouseenter={handleMouseEnter}
     on:mouseleave={handleMouseLeave}
     on:mousemove={handleMouseMove}
-    on:click={() => selectionMode ? dispatch('select', video) : dispatch('play', video)}
-    style={isSelected ? 'outline: 2px solid #ef4444; outline-offset: 2px; box-shadow: 0 0 0 4px rgba(239,68,68,0.15);' : ''}
+    on:click={() =>
+        selectionMode ? dispatch("select", video) : dispatch("play", video)}
+    style={isSelected
+        ? "outline: 2px solid #ef4444; outline-offset: 2px; box-shadow: 0 0 0 4px rgba(239,68,68,0.15);"
+        : ""}
 >
+    <!-- Top Info Bar (Always Visible) -->
+    <div
+        class="px-3 py-2 bg-gray-800/80 border-b border-gray-700/50 flex flex-col gap-0.5"
+    >
+        <div
+            class="text-[0.65rem] font-medium text-gray-300 flex justify-between"
+        >
+            <span>Created: {timeAgo(video.created)}</span>
+            <span
+                >Viewed: {video.lastViewTime
+                    ? timeAgo(video.lastViewTime)
+                    : "Never"}</span
+            >
+        </div>
+        <!-- {#if video.lastViewTime}
+            <div class="text-[0.55rem] text-gray-400">
+                Last view: {new Date(video.lastViewTime).toLocaleString()}
+            </div>
+        {/if} -->
+    </div>
+
     <!-- Video Preview / Thumbnail -->
     <div class="aspect-video bg-black relative overflow-hidden">
-        
-        <!-- Top Info Bar (Overlay) -->
-        <div
-            class="absolute top-0 left-0 right-0 p-2 bg-gradient-to-b from-black/90 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-30 flex flex-col gap-0.5"
-        >
-            <div class="text-[0.65rem] font-medium text-gray-300 flex justify-between">
-                <span>Created: {timeAgo(video.created)}</span>
-                <span>Viewed: {video.lastViewTime ? timeAgo(video.lastViewTime) : 'Never'}</span>
-            </div>
-            {#if video.lastViewTime}
-                <div class="text-[0.55rem] text-gray-400">
-                    Last view: {new Date(video.lastViewTime).toLocaleString()}
-                </div>
-            {/if}
-        </div>
         <!-- Mode: Preview (Sprite Sheet) -->
         {#if processPreview}
             <div
@@ -341,15 +354,30 @@
                 <div
                     class="w-6 h-6 rounded-md flex items-center justify-center transition-all"
                     style="
-                        background: {isSelected ? '#ef4444' : 'rgba(0,0,0,0.6)'};
-                        border: 2px solid {isSelected ? '#ef4444' : 'rgba(255,255,255,0.5)'};
+                        background: {isSelected
+                        ? '#ef4444'
+                        : 'rgba(0,0,0,0.6)'};
+                        border: 2px solid {isSelected
+                        ? '#ef4444'
+                        : 'rgba(255,255,255,0.5)'};
                         backdrop-filter: blur(4px);
                         box-shadow: 0 2px 8px rgba(0,0,0,0.4);
                     "
                 >
                     {#if isSelected}
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                            <path d="M2 6l3 3 5-5" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <svg
+                            width="12"
+                            height="12"
+                            viewBox="0 0 12 12"
+                            fill="none"
+                        >
+                            <path
+                                d="M2 6l3 3 5-5"
+                                stroke="white"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            />
                         </svg>
                     {/if}
                 </div>
@@ -358,7 +386,10 @@
 
         <!-- Selected Overlay Tint -->
         {#if isSelected}
-            <div class="absolute inset-0 z-10 pointer-events-none" style="background: rgba(239,68,68,0.12);"></div>
+            <div
+                class="absolute inset-0 z-10 pointer-events-none"
+                style="background: rgba(239,68,68,0.12);"
+            ></div>
         {/if}
 
         <!-- Actions Overlay -->
@@ -414,7 +445,9 @@
             <button
                 on:click={handleHide}
                 class="bg-black/60 p-2 rounded-full hover:bg-cyan-500/80 text-white backdrop-blur-sm transition"
-                title={video.hideUntil && video.hideUntil > Date.now() ? "Unhide" : "Hide"}
+                title={video.hideUntil && video.hideUntil > Date.now()
+                    ? "Unhide"
+                    : "Hide"}
             >
                 {#if video.hideUntil && video.hideUntil > Date.now()}
                     <Eye size={16} />
