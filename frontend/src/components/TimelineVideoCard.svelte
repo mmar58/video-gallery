@@ -12,6 +12,7 @@
         Image as ImageIcon,
         Heart,
         Scissors,
+        Info,
     } from "lucide-svelte";
     import { toast } from "../stores/toastStore";
     import { logStore } from "../stores/logStore";
