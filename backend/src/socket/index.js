@@ -110,7 +110,7 @@ module.exports = (io) => {
                     while (index < allVideos.length && socket.isTagging) {
                         const videoObj = allVideos[index++];
                         
-                        const meta = await store.get(videoObj.filename);
+                        const meta = await store.get(videoObj.dirId, videoObj.filename);
                         if (meta.tags && meta.tags.length > 0) {
                             continue;
                         }
@@ -138,7 +138,7 @@ module.exports = (io) => {
                             const tags = rawTags.filter(t => t.length < 30);
 
                             if (tags.length > 0) {
-                                await store.update(videoObj.filename, { tags: tags });
+                                await store.update(videoObj.dirId, videoObj.filename, { tags: tags });
                                 socket.emit('tagging-log', { message: `Tagged: ${tags.join(', ')}`, type: 'success' });
                             } else {
                                 socket.emit('tagging-log', { message: `No tags generated.`, type: 'warning' });
