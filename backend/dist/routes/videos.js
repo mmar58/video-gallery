@@ -9,6 +9,7 @@ const path_1 = __importDefault(require("path"));
 const store_1 = __importDefault(require("../data/store"));
 const db_1 = __importDefault(require("../data/db"));
 const auth_1 = require("../middlewares/auth");
+const fluent_ffmpeg_1 = __importDefault(require("fluent-ffmpeg"));
 const router = express_1.default.Router();
 router.use(auth_1.authenticateToken);
 // Helper to get allowed directories for user
@@ -347,5 +348,109 @@ router.delete('/:filename/tags/:tag', async (req, res) => {
     const meta = await store_1.default.update(dirId, filename, { tags: newTags });
     res.json(meta);
 });
-// Skipping trim/split/regenerate for brevity, let's export router
+router.post('/:filename/trim', async (req, res) => {
+    const { dirId, filename: oldName } = parseFilename(req.params.filename);
+    const { start, end, mode, saveAsNew, newName, overwriteTarget } = req.body;
+    if (!dirId || start === undefined || end === undefined)
+        return res.status(400).json({ error: 'Invalid input' });
+    const dirPath = await getDirectoryPath(dirId, req.user.id, req.user.is_admin);
+    if (!dirPath)
+        return res.status(403).json({ error: 'Directory access denied' });
+    const sourcePath = path_1.default.join(dirPath, oldName);
+    if (!fs_1.default.existsSync(sourcePath))
+        return res.status(404).json({ error: 'File not found' });
+    const finalNewName = newName || oldName;
+    const targetPath = path_1.default.join(dirPath, finalNewName);
+    if (!overwriteTarget && fs_1.default.existsSync(targetPath) && targetPath !== sourcePath) {
+        return res.status(409).json({ error: 'FILE_EXISTS' });
+    }
+    const tempPath = path_1.default.join(dirPath, `temp_${Date.now()}_${finalNewName}`);
+    try {
+        await new Promise((resolve, reject) => {
+            let command = (0, fluent_ffmpeg_1.default)(sourcePath);
+            if (mode === 'delete') {
+                command
+                    .complexFilter([
+                    `[0:v]trim=start=0:end=${start},setpts=PTS-STARTPTS[v1]`,
+                    `[0:a]atrim=start=0:end=${start},asetpts=PTS-STARTPTS[a1]`,
+                    `[0:v]trim=start=${end},setpts=PTS-STARTPTS[v2]`,
+                    `[0:a]atrim=start=${end},asetpts=PTS-STARTPTS[a2]`,
+                    `[v1][a1][v2][a2]concat=n=2:v=1:a=1[outv][outa]`
+                ])
+                    .outputOptions(['-map', '[outv]', '-map', '[outa]']);
+            }
+            else {
+                command.outputOptions([
+                    `-ss ${start}`,
+                    `-to ${end}`,
+                    '-c', 'copy'
+                ]);
+            }
+            command.output(tempPath)
+                .on('end', () => resolve(null))
+                .on('error', (err) => reject(err))
+                .run();
+        });
+        if (!saveAsNew && targetPath === sourcePath) {
+            fs_1.default.unlinkSync(sourcePath);
+            fs_1.default.renameSync(tempPath, targetPath);
+        }
+        else {
+            if (fs_1.default.existsSync(targetPath))
+                fs_1.default.unlinkSync(targetPath);
+            fs_1.default.renameSync(tempPath, targetPath);
+            await store_1.default.add(dirId, finalNewName);
+        }
+        res.json({ success: true, newName: `${dirId}::${finalNewName}` });
+    }
+    catch (err) {
+        console.error(err);
+        if (fs_1.default.existsSync(tempPath))
+            fs_1.default.unlinkSync(tempPath);
+        res.status(500).json({ error: 'Processing failed' });
+    }
+});
+router.post('/:filename/split', async (req, res) => {
+    const { dirId, filename: oldName } = parseFilename(req.params.filename);
+    const { splitTime } = req.body;
+    if (!dirId || splitTime === undefined)
+        return res.status(400).json({ error: 'Invalid input' });
+    const dirPath = await getDirectoryPath(dirId, req.user.id, req.user.is_admin);
+    if (!dirPath)
+        return res.status(403).json({ error: 'Directory access denied' });
+    const sourcePath = path_1.default.join(dirPath, oldName);
+    if (!fs_1.default.existsSync(sourcePath))
+        return res.status(404).json({ error: 'File not found' });
+    const ext = path_1.default.extname(oldName);
+    const base = path_1.default.basename(oldName, ext);
+    const part1Name = `${base}_part1${ext}`;
+    const part2Name = `${base}_part2${ext}`;
+    const part1Path = path_1.default.join(dirPath, part1Name);
+    const part2Path = path_1.default.join(dirPath, part2Name);
+    try {
+        await new Promise((resolve, reject) => {
+            (0, fluent_ffmpeg_1.default)(sourcePath)
+                .outputOptions([`-to ${splitTime}`, '-c', 'copy'])
+                .output(part1Path)
+                .on('end', () => resolve(null))
+                .on('error', (err) => reject(err))
+                .run();
+        });
+        await new Promise((resolve, reject) => {
+            (0, fluent_ffmpeg_1.default)(sourcePath)
+                .outputOptions([`-ss ${splitTime}`, '-c', 'copy'])
+                .output(part2Path)
+                .on('end', () => resolve(null))
+                .on('error', (err) => reject(err))
+                .run();
+        });
+        await store_1.default.add(dirId, part1Name);
+        await store_1.default.add(dirId, part2Name);
+        res.json({ success: true });
+    }
+    catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Processing failed' });
+    }
+});
 exports.default = router;

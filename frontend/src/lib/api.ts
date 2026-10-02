@@ -185,7 +185,7 @@ export const api = {
     },
 
     async addTag(filename: string, tag: string): Promise<any> {
-        const res = await fetchWithAuth(`${API_URL}/${filename}/tags`, {
+        const res = await fetchWithAuth(`${API_URL}/${encodeURIComponent(filename)}/tags`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ tag })
@@ -194,7 +194,7 @@ export const api = {
     },
 
     async regenerateTags(filename: string, modelName: string): Promise<any> {
-        const res = await fetchWithAuth(`${API_URL}/${filename}/regenerate-tags`, {
+        const res = await fetchWithAuth(`${API_URL}/${encodeURIComponent(filename)}/regenerate-tags`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ modelName })
@@ -203,24 +203,24 @@ export const api = {
     },
 
     async removeTag(filename: string, tag: string): Promise<any> {
-        const res = await fetchWithAuth(`${API_URL}/${filename}/tags/${tag}`, {
+        const res = await fetchWithAuth(`${API_URL}/${encodeURIComponent(filename)}/tags/${tag}`, {
             method: 'DELETE'
         });
         return await res.json();
     },
 
     async likeVideo(filename: string): Promise<any> {
-        const res = await fetchWithAuth(`${API_URL}/${filename}/like`, { method: 'POST' });
+        const res = await fetchWithAuth(`${API_URL}/${encodeURIComponent(filename)}/like`, { method: 'POST' });
         return await res.json();
     },
 
     async recordView(filename: string): Promise<any> {
-        const res = await fetchWithAuth(`${API_URL}/${filename}/view`, { method: 'POST' });
+        const res = await fetchWithAuth(`${API_URL}/${encodeURIComponent(filename)}/view`, { method: 'POST' });
         return await res.json();
     },
 
     async hideVideo(filename: string, days: number | string): Promise<any> {
-        const res = await fetchWithAuth(`${API_URL}/${filename}/hide`, {
+        const res = await fetchWithAuth(`${API_URL}/${encodeURIComponent(filename)}/hide`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ days: Number(days) })
@@ -229,7 +229,7 @@ export const api = {
     },
 
     async renameVideo(filename: string, newName: string): Promise<any> {
-        const res = await fetchWithAuth(`${API_URL}/${filename}`, {
+        const res = await fetchWithAuth(`${API_URL}/${encodeURIComponent(filename)}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ newName })
@@ -239,7 +239,7 @@ export const api = {
     },
 
     async deleteVideo(filename: string): Promise<any> {
-        const res = await fetchWithAuth(`${API_URL}/${filename}`, { method: 'DELETE' });
+        const res = await fetchWithAuth(`${API_URL}/${encodeURIComponent(filename)}`, { method: 'DELETE' });
         if (!res.ok) throw new Error('Delete failed');
         return await res.json();
     },
@@ -268,7 +268,7 @@ export const api = {
 
     getStreamUrl(filename: string): string {
         const token = getAuthToken();
-        const base = `${API_URL}/${filename}/stream`;
+        const base = `${API_URL}/${encodeURIComponent(filename)}/stream`;
         return token ? `${base}?token=${token}` : base;
     },
 
@@ -278,7 +278,7 @@ export const api = {
     },
 
     async trimVideo(filename: string, start: number, end: number, mode: string, saveAsNew: boolean, newName: string, overwriteTarget: boolean = false): Promise<any> {
-        const res = await fetchWithAuth(`${API_URL}/${filename}/trim`, {
+        const res = await fetchWithAuth(`${API_URL}/${encodeURIComponent(filename)}/trim`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ start, end, mode, saveAsNew, newName, overwriteTarget })
@@ -291,7 +291,7 @@ export const api = {
     },
 
     async splitVideo(filename: string, splitTime: number): Promise<any> {
-        const res = await fetchWithAuth(`${API_URL}/${filename}/split`, {
+        const res = await fetchWithAuth(`${API_URL}/${encodeURIComponent(filename)}/split`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ splitTime })

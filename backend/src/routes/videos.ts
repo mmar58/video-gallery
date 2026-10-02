@@ -364,5 +364,119 @@ router.delete('/:filename/tags/:tag', async (req, res) => {
     res.json(meta);
 });
 
-// Skipping trim/split/regenerate for brevity, let's export router
+router.post('/:filename/trim', async (req: AuthRequest, res) => {
+    const { dirId, filename: oldName } = parseFilename(req.params.filename as string);
+    const { start, end, mode, saveAsNew, newName, overwriteTarget } = req.body;
+    
+    if (!dirId || start === undefined || end === undefined) return res.status(400).json({ error: 'Invalid input' });
+
+    const dirPath = await getDirectoryPath(dirId, req.user.id, req.user.is_admin);
+    if (!dirPath) return res.status(403).json({ error: 'Directory access denied' });
+    
+    const sourcePath = path.join(dirPath, oldName);
+    if (!fs.existsSync(sourcePath)) return res.status(404).json({ error: 'File not found' });
+
+    const finalNewName = newName || oldName;
+    const targetPath = path.join(dirPath, finalNewName);
+    
+    if (!overwriteTarget && fs.existsSync(targetPath) && targetPath !== sourcePath) {
+        return res.status(409).json({ error: 'FILE_EXISTS' });
+    }
+
+    const tempPath = path.join(dirPath, `temp_${Date.now()}_${finalNewName}`);
+
+    try {
+        await new Promise((resolve, reject) => {
+            let command = ffmpeg(sourcePath);
+            if (mode === 'delete') {
+                command
+                    .complexFilter([
+                        `[0:v]trim=start=0:end=${start},setpts=PTS-STARTPTS[v1]`,
+                        `[0:a]atrim=start=0:end=${start},asetpts=PTS-STARTPTS[a1]`,
+                        `[0:v]trim=start=${end},setpts=PTS-STARTPTS[v2]`,
+                        `[0:a]atrim=start=${end},asetpts=PTS-STARTPTS[a2]`,
+                        `[v1][a1][v2][a2]concat=n=2:v=1:a=1[outv][outa]`
+                    ])
+                    .outputOptions(['-map', '[outv]', '-map', '[outa]']);
+            } else {
+                command.outputOptions([
+                    `-ss ${start}`,
+                    `-to ${end}`,
+                    '-c', 'copy'
+                ]);
+            }
+            
+            command.output(tempPath)
+                .on('end', () => resolve(null))
+                .on('error', (err) => reject(err))
+                .run();
+        });
+
+        if (!saveAsNew && targetPath === sourcePath) {
+            fs.unlinkSync(sourcePath);
+            fs.renameSync(tempPath, targetPath);
+        } else {
+            if (fs.existsSync(targetPath)) fs.unlinkSync(targetPath);
+            fs.renameSync(tempPath, targetPath);
+            await store.add(dirId, finalNewName);
+        }
+
+        res.json({ success: true, newName: `${dirId}::${finalNewName}` });
+    } catch (err) {
+        console.error(err);
+        if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+        res.status(500).json({ error: 'Processing failed' });
+    }
+});
+
+router.post('/:filename/split', async (req: AuthRequest, res) => {
+    const { dirId, filename: oldName } = parseFilename(req.params.filename as string);
+    const { splitTime } = req.body;
+    
+    if (!dirId || splitTime === undefined) return res.status(400).json({ error: 'Invalid input' });
+
+    const dirPath = await getDirectoryPath(dirId, req.user.id, req.user.is_admin);
+    if (!dirPath) return res.status(403).json({ error: 'Directory access denied' });
+    
+    const sourcePath = path.join(dirPath, oldName);
+    if (!fs.existsSync(sourcePath)) return res.status(404).json({ error: 'File not found' });
+
+    const ext = path.extname(oldName);
+    const base = path.basename(oldName, ext);
+    const part1Name = `${base}_part1${ext}`;
+    const part2Name = `${base}_part2${ext}`;
+    
+    const part1Path = path.join(dirPath, part1Name);
+    const part2Path = path.join(dirPath, part2Name);
+
+    try {
+        await new Promise((resolve, reject) => {
+            ffmpeg(sourcePath)
+                .outputOptions([`-to ${splitTime}`, '-c', 'copy'])
+                .output(part1Path)
+                .on('end', () => resolve(null))
+                .on('error', (err) => reject(err))
+                .run();
+        });
+
+        await new Promise((resolve, reject) => {
+            ffmpeg(sourcePath)
+                .outputOptions([`-ss ${splitTime}`, '-c', 'copy'])
+                .output(part2Path)
+                .on('end', () => resolve(null))
+                .on('error', (err) => reject(err))
+                .run();
+        });
+
+        await store.add(dirId, part1Name);
+        await store.add(dirId, part2Name);
+
+        res.json({ success: true });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Processing failed' });
+    }
+});
+
 export default router;
+
