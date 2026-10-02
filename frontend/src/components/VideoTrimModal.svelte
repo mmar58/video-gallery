@@ -30,7 +30,7 @@
         splitTime = 0;
         mode = "trim";
         cutMode = "keep";
-        newName = video.name;
+        newName = video.displayName || video.name.split('::').pop() || video.name;
         if (videoEl) videoEl.load();
     }
 

@@ -120,8 +120,9 @@
 
     function handleRename(e: Event) {
         e.stopPropagation();
-        const newName = prompt("Rename video:", video.name);
-        if (newName && newName !== video.name) {
+        const defaultName = video.displayName || video.name.split('::').pop() || video.name;
+        const newName = prompt("Rename video:", defaultName);
+        if (newName && newName !== defaultName && newName !== video.name) {
             videoStore.rename(video.name, newName);
         }
     }
