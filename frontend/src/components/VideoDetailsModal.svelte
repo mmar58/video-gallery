@@ -17,6 +17,7 @@
         Plus,
         Ban,
         Scissors,
+        Loader2,
     } from "lucide-svelte";
 
     export let isOpen = false;
@@ -30,6 +31,7 @@
     
     let models = [];
     let selectedModel = "";
+    let loadingModels = false;
     let regeneratingTags = false;
 
     $: if (isOpen && video) {
@@ -107,11 +109,22 @@
     async function loadModels() {
         if (models.length > 0) return;
         try {
-            const m = await api.getModels();
-            models = m.map(item => item.name);
-            if (models.length > 0) selectedModel = models[0];
+            loadingModels = true;
+            const [savedSettings, m] = await Promise.all([
+                api.fetchOllamaSettings().catch(() => null),
+                api.getModels().catch(() => [])
+            ]);
+            models = (m || []).map(item => item.name || item);
+            const savedModel = savedSettings?.tagModel || "";
+            if (models.includes(savedModel)) {
+                selectedModel = savedModel;
+            } else if (models.length > 0) {
+                selectedModel = models[0];
+            }
         } catch (e) {
             console.error("Failed to load models", e);
+        } finally {
+            loadingModels = false;
         }
     }
 
@@ -122,11 +135,12 @@
             toast.info("Regenerating tags with Ollama...");
             const updated = await api.regenerateTags(video.name, selectedModel);
             video.tags = updated.tags;
+            videoStore.setVideoTags(video.name, updated.tags);
             dispatch("refresh");
             toast.success("Tags regenerated and added");
             logStore.add(`Regenerated tags for ${video.name}`, "success");
         } catch (e) {
-            toast.error("Failed to regenerate tags");
+            toast.error(e?.message || "Failed to regenerate tags");
         } finally {
             regeneratingTags = false;
         }
@@ -392,6 +406,14 @@
                                 Auto-Tag
                             </button>
                         </div>
+                        {:else if loadingModels}
+                        <div class="flex items-center gap-1 text-xs text-gray-400">
+                            <Loader2 size={12} class="animate-spin" /> Loading models...
+                        </div>
+                        {:else}
+                        <button class="text-xs text-gray-400 hover:text-gray-200 flex items-center gap-1 px-2 py-1 bg-gray-800 rounded border border-gray-700 transition" on:click={loadModels}>
+                            <RefreshCw size={12} /> Retry Models
+                        </button>
                         {/if}
                     </div>
 

@@ -138,6 +138,13 @@ function createVideoStore() {
                 }));
             } catch (e) { console.error(e); }
         },
+        setVideoTags: (filename: string, tags: string[]) => {
+            update(s => ({
+                ...s,
+                videos: s.videos.map(v => v.name === filename ? { ...v, tags } : v),
+                tags: Array.from(new Set([...s.tags, ...tags])).sort()
+            }));
+        },
         toggleLike: async (filename: string) => {
             try {
                 const meta = await api.likeVideo(filename);

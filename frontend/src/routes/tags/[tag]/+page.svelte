@@ -194,6 +194,7 @@
     <VideoDetailsModal
         bind:isOpen={isDetailsOpen}
         video={selectedVideo}
+        on:refresh={handleRefresh}
         on:trim={(e) => handleTrim({ detail: e.detail })}
     />
     <VideoTrimModal

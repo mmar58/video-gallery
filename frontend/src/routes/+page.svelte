@@ -137,6 +137,7 @@
     <VideoDetailsModal
         bind:isOpen={isDetailsOpen}
         video={selectedVideo}
+        on:refresh={() => videoStore.load($searchValue, $sortValue, $videoStore.page, $tagValue)}
         on:trim={(e) => {
             selectedVideo = e.detail;
             isTrimOpen = true;

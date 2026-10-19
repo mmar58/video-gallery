@@ -10,6 +10,7 @@ const store_1 = __importDefault(require("../data/store"));
 const db_1 = __importDefault(require("../data/db"));
 const auth_1 = require("../middlewares/auth");
 const fluent_ffmpeg_1 = __importDefault(require("fluent-ffmpeg"));
+const config_1 = __importDefault(require("../config"));
 const router = express_1.default.Router();
 router.use(auth_1.authenticateToken);
 // Helper to get allowed directories for user
@@ -347,6 +348,57 @@ router.delete('/:filename/tags/:tag', async (req, res) => {
     const newTags = currentTags.filter((t) => t !== tag);
     const meta = await store_1.default.update(dirId, filename, { tags: newTags });
     res.json(meta);
+});
+// Helper to get blacklist
+const getBlacklist = () => {
+    const blacklistFile = path_1.default.join(config_1.default.dataDir, 'blacklist.json');
+    if (!fs_1.default.existsSync(blacklistFile))
+        return [];
+    try {
+        return JSON.parse(fs_1.default.readFileSync(blacklistFile, 'utf8'));
+    }
+    catch (e) {
+        return [];
+    }
+};
+// POST /api/videos/:filename/regenerate-tags - Regenerate tags using LLM
+router.post('/:filename/regenerate-tags', async (req, res) => {
+    try {
+        const { dirId, filename } = parseFilename(req.params.filename);
+        let { modelName } = req.body;
+        if (!modelName) {
+            const { getOllamaSettings } = require('../data/settingsStore');
+            const settings = await getOllamaSettings();
+            modelName = settings?.tagModel || 'llama3';
+        }
+        if (dirId) {
+            const dirPath = await getDirectoryPath(dirId, req.user.id, req.user.is_admin);
+            if (!dirPath)
+                return res.status(403).json({ error: 'Directory access denied' });
+        }
+        const baseName = path_1.default.parse(filename).name;
+        const prompt = "Generate 5-8 relevant, concise keywords/tags based on the filename. Return ONLY tags, comma-separated. No sentences.";
+        const { generateTagsFromText } = require('../services/ollamaService');
+        const ollamaResponse = await generateTagsFromText(modelName, baseName, prompt);
+        const blacklist = getBlacklist();
+        let rawTags = (ollamaResponse || '')
+            .split(/,|;|\n/)
+            .map((t) => t.trim().replace(/^[-*•0-9.]+\s*/, '').replace(/^["']+|["']+$/g, '').trim())
+            .filter((t) => t.length > 0);
+        rawTags = rawTags.filter((t) => !blacklist.includes(t.toLowerCase()));
+        const newTags = rawTags.filter((t) => t.length > 1 && t.length < 30);
+        const currentMeta = await store_1.default.get(dirId, filename);
+        const currentTags = currentMeta.tags || [];
+        const existingLower = new Set(currentTags.map((t) => t.toLowerCase()));
+        const uniqueNewTags = newTags.filter((t) => !existingLower.has(t.toLowerCase()));
+        const combinedTags = [...currentTags, ...uniqueNewTags];
+        const meta = await store_1.default.update(dirId, filename, { tags: combinedTags });
+        res.json(meta);
+    }
+    catch (error) {
+        console.error('Error regenerating tags:', error);
+        res.status(500).json({ error: error.message || 'Failed to regenerate tags' });
+    }
 });
 router.post('/:filename/trim', async (req, res) => {
     const { dirId, filename: oldName } = parseFilename(req.params.filename);

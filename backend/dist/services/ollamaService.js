@@ -206,10 +206,25 @@ class OllamaPool {
         return results;
     }
     async generateTagsFromText(modelMap, text, prompt = "Generate 5-10 relevant keywords or tags based on this text. Comma separated, no intro.", signal, logCallback = null) {
-        const isMap = typeof modelMap === 'object';
-        const allowedEndpointIds = isMap
-            ? Object.keys(modelMap).filter(id => modelMap[id] && modelMap[id] !== 'skip')
-            : null;
+        const isMap = typeof modelMap === 'object' && modelMap !== null;
+        let allowedEndpointIds = null;
+        if (isMap) {
+            allowedEndpointIds = Object.keys(modelMap).filter(id => modelMap[id] && modelMap[id] !== 'skip');
+        }
+        else if (typeof modelMap === 'string' && modelMap) {
+            try {
+                const servers = await this.getModelsPerServer();
+                const matchingServers = servers.filter(s => s.status === 'online' &&
+                    s.models &&
+                    s.models.some(m => m.name === modelMap || m.name?.split(':')[0] === modelMap));
+                if (matchingServers.length > 0) {
+                    allowedEndpointIds = matchingServers.map(s => s.endpoint.id);
+                }
+            }
+            catch (err) {
+                console.warn('[OllamaPool] Could not check models per server:', err.message);
+            }
+        }
         return this.dispatchTask(async (client, ep) => {
             const modelName = isMap ? modelMap[ep.id] : modelMap;
             const timeoutMs = 45000;

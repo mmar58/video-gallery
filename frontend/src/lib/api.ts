@@ -199,6 +199,14 @@ export const api = {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ modelName })
         });
+        if (!res.ok) {
+            let errorMsg = `Failed to regenerate tags (${res.status})`;
+            try {
+                const errData = await res.json();
+                if (errData && errData.error) errorMsg = errData.error;
+            } catch (_) {}
+            throw new Error(errorMsg);
+        }
         return await res.json();
     },
 
