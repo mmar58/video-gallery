@@ -1,11 +1,15 @@
 <script lang="ts">
-  import { createEventDispatcher, onMount } from "svelte";
+  import { createEventDispatcher, onMount, onDestroy } from "svelte";
+  import { ChevronDown, ChevronUp, Play, Pause, X } from "lucide-svelte";
   import { api } from "../lib/api";
+  import { isMobile } from "../lib/device";
+  import { mobilePlayerId } from "../stores/uiStore";
 
   export let video: any;
   export let zIndex: number = 100;
 
   const dispatch = createEventDispatcher();
+  const myId = Date.now() + Math.random();
   let videoEl: HTMLVideoElement;
   let containerEl: HTMLDivElement;
 
@@ -20,7 +24,14 @@
   let top = 20;
   let width = 640;
 
+  // Phone mode: docked at the top of the screen, or minimized into a mini player bar.
+  let minimized = false;
+  let paused = false;
+  let dockHeight = 0;
+  let mounted = false;
+
   onMount(() => {
+    mounted = true;
     if (typeof window !== "undefined") {
       const vw = window.innerWidth;
       const vh = window.innerHeight;
@@ -41,7 +52,35 @@
       top = Math.min(top, vh - 120); // 120px minimum visible height
       left = Math.max(0, left);
       top = Math.max(0, top);
+
+      // Phones: claim the single player slot (other players close themselves).
+      if (vw < 768) mobilePlayerId.set(myId);
     }
+  });
+
+  // One player at a time on phones.
+  $: if (mounted && $isMobile && $mobilePlayerId !== null && $mobilePlayerId !== myId) {
+    dispatch("close");
+  }
+
+  // Reserve space under the docked player so page content isn't hidden behind it,
+  // and flag the mini player so floating elements can lift above it.
+  $: if (typeof document !== "undefined") applyDock($isMobile, minimized, dockHeight);
+
+  function applyDock(mobile: boolean, isMin: boolean, height: number) {
+    if (!mobile) return;
+    document.body.dataset.playerOwner = String(myId);
+    document.body.style.paddingTop = !isMin && height ? `${height}px` : "";
+    document.body.classList.toggle("mini-player", isMin);
+  }
+
+  onDestroy(() => {
+    if (typeof document !== "undefined" && document.body.dataset.playerOwner === String(myId)) {
+      document.body.style.paddingTop = "";
+      document.body.classList.remove("mini-player");
+      delete document.body.dataset.playerOwner;
+    }
+    mobilePlayerId.update((id) => (id === myId ? null : id));
   });
 
   function handleStart(clientX: number, clientY: number) {
@@ -123,6 +162,12 @@
     dispatch("close");
   }
 
+  function togglePlay() {
+    if (!videoEl) return;
+    if (videoEl.paused) videoEl.play().catch(() => {});
+    else videoEl.pause();
+  }
+
   function handleTimeUpdate(e: Event) {
     if (videoEl) {
       localStorage.setItem(`video-time-${video.name}`, videoEl.currentTime.toString());
@@ -172,6 +217,8 @@
       audioTracks = [];
     }
 
+    // Desktop floating window only: shrink the window for portrait videos.
+    if ($isMobile) return;
     const target = e.target as HTMLVideoElement;
     const videoWidth = target.videoWidth;
     const videoHeight = target.videoHeight;
@@ -190,68 +237,175 @@
   }
 </script>
 
-<div
-  bind:this={containerEl}
-  class="fixed shadow-2xl rounded-lg bg-gray-900 border border-gray-700 flex flex-col overflow-hidden player-window"
-  style="left: {left}px; top: {top}px; width: {width}px; z-index: {zIndex}; max-width: calc(100% - {left}px); max-height: calc(100% - {top}px);"
-  on:mousedown={handleMouseDown}
-  on:touchstart={handleTouchStart}
->
-  <!-- Header / Drag Handle -->
+{#if $isMobile}
+  <!-- Phone player: docked full-width at the top, or minimized to a bar above the tab bar -->
   <div
-    class="drag-handle bg-gray-800 p-2 cursor-move flex justify-between items-center select-none shrink-0"
+    bind:clientHeight={dockHeight}
+    class="fixed left-0 right-0 flex bg-gray-900 shadow-2xl {minimized
+      ? 'mini-player-bar above-bottom-nav mx-2 h-16 flex-row items-center overflow-hidden rounded-xl border border-gray-700'
+      : 'top-0 flex-col border-b border-gray-800'}"
+    style="z-index: {zIndex}; {minimized ? '' : 'padding-top: env(safe-area-inset-top, 0px);'}"
   >
-    <h3 class="text-white text-sm font-medium truncate px-2 max-w-[60%]">
-      {video.name}
-    </h3>
-    <div class="flex items-center gap-2">
-      {#if audioTracks.length > 1}
-        <div class="relative">
-          <button
-            on:click|stopPropagation={() => showTrackMenu = !showTrackMenu}
-            class="text-xs bg-gray-700 hover:bg-gray-600 text-white px-2 py-1 rounded transition"
-          >
-            Audio Tracks
-          </button>
-          {#if showTrackMenu}
-            <div class="absolute right-0 top-full mt-1 bg-gray-800 border border-gray-700 rounded shadow-lg z-50 min-w-[120px] overflow-hidden">
-              {#each audioTracks as track, i}
-                <button
-                  on:click|stopPropagation={() => selectAudioTrack(i)}
-                  class="w-full text-left px-3 py-2 text-xs text-white hover:bg-gray-700 transition {track.enabled ? 'bg-blue-600 hover:bg-blue-500' : ''}"
-                >
-                  {track.language || track.label || `Track ${i + 1}`}
-                </button>
-              {/each}
+    {#if !minimized}
+      <div class="flex h-11 shrink-0 items-center justify-between bg-gray-800 pl-3 pr-1">
+        <h3 class="min-w-0 flex-1 truncate pr-2 text-sm font-medium text-white">
+          {video.name}
+        </h3>
+        <div class="flex items-center">
+          {#if audioTracks.length > 1}
+            <div class="relative">
+              <button
+                on:click|stopPropagation={() => showTrackMenu = !showTrackMenu}
+                class="mr-1 rounded bg-gray-700 px-2.5 py-2 text-xs text-white active:bg-gray-600"
+              >
+                Audio
+              </button>
+              {#if showTrackMenu}
+                <div class="absolute right-0 top-full z-50 mt-1 min-w-[140px] overflow-hidden rounded border border-gray-700 bg-gray-800 shadow-lg">
+                  {#each audioTracks as track, i}
+                    <button
+                      on:click|stopPropagation={() => selectAudioTrack(i)}
+                      class="w-full px-3 py-3 text-left text-xs text-white active:bg-gray-700 {track.enabled ? 'bg-blue-600' : ''}"
+                    >
+                      {track.language || track.label || `Track ${i + 1}`}
+                    </button>
+                  {/each}
+                </div>
+              {/if}
             </div>
           {/if}
+          <button
+            on:click={() => (minimized = true)}
+            class="flex h-11 w-11 items-center justify-center text-gray-300 active:text-white"
+            aria-label="Minimize player"
+          >
+            <ChevronDown size={22} />
+          </button>
+          <button
+            on:click={close}
+            class="flex h-11 w-11 items-center justify-center text-gray-300 active:text-white"
+            aria-label="Close player"
+          >
+            <X size={22} />
+          </button>
         </div>
-      {/if}
+      </div>
+    {/if}
+
+    <!-- Same <video> element in both modes, so minimizing never interrupts playback -->
+    <div
+      class="bg-black {minimized ? 'h-full w-28 shrink-0' : 'w-full'}"
+      style={minimized ? '' : 'aspect-ratio: 16 / 9; max-height: 60dvh;'}
+    >
+      <video
+        bind:this={videoEl}
+        bind:paused
+        src={api.getStreamUrl(video.name)}
+        class="h-full w-full object-contain"
+        controls={!minimized}
+        autoplay
+        playsinline
+        on:loadedmetadata={handleLoadedMetadata}
+        on:timeupdate={handleTimeUpdate}
+        on:volumechange={handleVolumeChange}
+      ></video>
+    </div>
+
+    {#if minimized}
       <button
-        on:click|stopPropagation={close}
-        class="text-gray-400 hover:text-white px-2 text-lg leading-none"
+        class="min-w-0 flex-1 truncate px-3 text-left text-sm font-medium text-white"
+        on:click={() => (minimized = false)}
+        aria-label="Expand player"
       >
-        &times;
+        {video.name}
       </button>
+      <button
+        on:click={togglePlay}
+        class="flex h-12 w-11 shrink-0 items-center justify-center text-white active:text-gray-300"
+        aria-label={paused ? "Play" : "Pause"}
+      >
+        {#if paused}<Play size={22} class="fill-white" />{:else}<Pause size={22} class="fill-white" />{/if}
+      </button>
+      <button
+        on:click={() => (minimized = false)}
+        class="flex h-12 w-10 shrink-0 items-center justify-center text-gray-300 active:text-white"
+        aria-label="Expand player"
+      >
+        <ChevronUp size={22} />
+      </button>
+      <button
+        on:click={close}
+        class="flex h-12 w-11 shrink-0 items-center justify-center text-gray-300 active:text-white"
+        aria-label="Close player"
+      >
+        <X size={20} />
+      </button>
+    {/if}
+  </div>
+{:else}
+  <div
+    bind:this={containerEl}
+    class="fixed shadow-2xl rounded-lg bg-gray-900 border border-gray-700 flex flex-col overflow-hidden player-window"
+    style="left: {left}px; top: {top}px; width: {width}px; z-index: {zIndex}; max-width: calc(100% - {left}px); max-height: calc(100% - {top}px);"
+    on:mousedown={handleMouseDown}
+    on:touchstart={handleTouchStart}
+  >
+    <!-- Header / Drag Handle -->
+    <div
+      class="drag-handle bg-gray-800 p-2 cursor-move flex justify-between items-center select-none shrink-0"
+    >
+      <h3 class="text-white text-sm font-medium truncate px-2 max-w-[60%]">
+        {video.name}
+      </h3>
+      <div class="flex items-center gap-2">
+        {#if audioTracks.length > 1}
+          <div class="relative">
+            <button
+              on:click|stopPropagation={() => showTrackMenu = !showTrackMenu}
+              class="text-xs bg-gray-700 hover:bg-gray-600 text-white px-2 py-1 rounded transition"
+            >
+              Audio Tracks
+            </button>
+            {#if showTrackMenu}
+              <div class="absolute right-0 top-full mt-1 bg-gray-800 border border-gray-700 rounded shadow-lg z-50 min-w-[120px] overflow-hidden">
+                {#each audioTracks as track, i}
+                  <button
+                    on:click|stopPropagation={() => selectAudioTrack(i)}
+                    class="w-full text-left px-3 py-2 text-xs text-white hover:bg-gray-700 transition {track.enabled ? 'bg-blue-600 hover:bg-blue-500' : ''}"
+                  >
+                    {track.language || track.label || `Track ${i + 1}`}
+                  </button>
+                {/each}
+              </div>
+            {/if}
+          </div>
+        {/if}
+        <button
+          on:click|stopPropagation={close}
+          class="text-gray-400 hover:text-white px-2 text-lg leading-none"
+        >
+          &times;
+        </button>
+      </div>
+    </div>
+
+    <!-- Content -->
+    <div
+      class="relative bg-black flex-1 flex items-center justify-center min-h-0 overflow-hidden"
+    >
+      <video
+        bind:this={videoEl}
+        src={api.getStreamUrl(video.name)}
+        class="w-full h-full max-w-full max-h-full object-contain"
+        controls
+        autoplay
+        on:loadedmetadata={handleLoadedMetadata}
+        on:timeupdate={handleTimeUpdate}
+        on:volumechange={handleVolumeChange}
+      ></video>
     </div>
   </div>
-
-  <!-- Content -->
-  <div
-    class="relative bg-black flex-1 flex items-center justify-center min-h-0 overflow-hidden"
-  >
-    <video
-      bind:this={videoEl}
-      src={api.getStreamUrl(video.name)}
-      class="w-full h-full max-w-full max-h-full object-contain"
-      controls
-      autoplay
-      on:loadedmetadata={handleLoadedMetadata}
-      on:timeupdate={handleTimeUpdate}
-      on:volumechange={handleVolumeChange}
-    ></video>
-  </div>
-</div>
+{/if}
 
 <style>
   .player-window {

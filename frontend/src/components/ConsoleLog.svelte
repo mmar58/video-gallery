@@ -92,7 +92,7 @@
 
 {#if isOpen}
     <div
-        class="fixed bottom-4 right-4 z-[9999] w-80 md:w-96 shadow-2xl rounded-lg overflow-hidden border border-gray-700 bg-gray-900 font-mono text-sm"
+        class="console-float fixed bottom-4 left-2 right-2 z-[9999] shadow-2xl rounded-lg overflow-hidden border border-gray-700 bg-gray-900 font-mono text-sm md:left-auto md:right-4 md:w-96"
         transition:fly={{ y: 200, duration: 300 }}
     >
         <!-- Header -->
@@ -152,7 +152,7 @@
         {#if !isMinimized}
             <div
                 bind:this={logContainer}
-                class="h-64 overflow-y-auto p-4 bg-gray-900/95 space-y-1 scrollbar-thin scrollbar-thumb-gray-600"
+                class="h-[40dvh] md:h-64 overflow-y-auto p-4 bg-gray-900/95 space-y-1 scrollbar-thin scrollbar-thumb-gray-600"
             >
                 {#if logs.length === 0}
                     <div class="text-gray-500 italic text-center py-4">
@@ -174,7 +174,7 @@
     <!-- Floating Trigger Button -->
     <button
         on:click={toggleOpen}
-        class="fixed bottom-4 right-4 z-[9999] bg-gray-800 text-white p-3 rounded-full shadow-lg border border-gray-700 hover:bg-gray-700 transition-all flex items-center gap-2"
+        class="console-float fixed bottom-4 right-4 z-[9999] bg-gray-800 text-white p-3 rounded-full shadow-lg border border-gray-700 hover:bg-gray-700 transition-all flex items-center gap-2"
     >
         <Terminal size={20} />
         {#if logs.length > 0}

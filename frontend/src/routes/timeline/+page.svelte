@@ -7,6 +7,7 @@
     import VideoPlayer from "../../components/VideoPlayer.svelte";
     import VideoDetailsModal from "../../components/VideoDetailsModal.svelte";
     import VideoTrimModal from "../../components/VideoTrimModal.svelte";
+    import { mobileGridCols } from "../../stores/uiStore";
 
     let videos = [];
     let groupedVideos = {}; // { 'YYYY-MM-DD': [videos] }
@@ -108,38 +109,38 @@
     }
 </script>
 
-<div class="min-h-screen bg-gray-900 text-gray-100 p-6">
+<div class="min-h-screen bg-gray-900 text-gray-100 p-3 md:p-6 pb-20">
     <div class="max-w-7xl mx-auto">
-        <header class="flex justify-between items-center mb-8">
+        <header class="flex justify-between items-center mb-6 md:mb-8">
             <h1
-                class="text-3xl font-bold bg-gradient-to-r from-red-500 to-purple-500 bg-clip-text text-transparent"
+                class="text-2xl md:text-3xl font-bold bg-gradient-to-r from-red-500 to-purple-500 bg-clip-text text-transparent"
             >
                 Video Timeline
             </h1>
-            <a href="{base}/" class="text-gray-400 hover:text-white underline"
+            <a href="{base}/" class="text-sm md:text-base text-gray-400 hover:text-white underline"
                 >Back to Gallery</a
             >
         </header>
 
         <div
-            class="space-y-12 relative border-l-2 border-gray-700 ml-4 pl-8 pb-8"
+            class="space-y-8 md:space-y-12 relative border-l-2 border-gray-700 ml-2 pl-4 md:ml-4 md:pl-8 pb-8"
         >
             {#each Object.entries(groupedVideos) as [date, daysVideos]}
                 <div class="relative">
                     <!-- Timeline Dot -->
                     <div
-                        class="absolute -left-[41px] top-0 w-5 h-5 rounded-full bg-red-500 border-4 border-gray-900"
+                        class="absolute -left-[27px] md:-left-[43px] top-0.5 w-5 h-5 rounded-full bg-red-500 border-4 border-gray-900"
                     ></div>
 
-                    <h2 class="text-xl font-semibold mb-4 text-gray-300">
+                    <h2 class="text-lg md:text-xl font-semibold mb-3 md:mb-4 text-gray-300">
                         {date}
-                        <span class="text-sm font-normal text-gray-500"
+                        <span class="text-xs md:text-sm font-normal text-gray-500"
                             >({daysVideos.length} videos)</span
                         >
                     </h2>
 
                     <div
-                        class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6"
+                        class="grid {$mobileGridCols === 2 ? 'grid-cols-2' : 'grid-cols-1'} sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-6"
                     >
                         {#each daysVideos as video (video.name)}
                             <TimelineVideoCard

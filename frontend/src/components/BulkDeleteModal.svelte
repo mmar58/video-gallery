@@ -55,12 +55,12 @@
     <!-- svelte-ignore a11y-click-events-have-key-events -->
     <!-- svelte-ignore a11y-no-static-element-interactions -->
     <div
-        class="modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4"
+        class="modal-backdrop fixed inset-0 z-50 flex items-end justify-center md:items-center md:p-4"
         on:click={handleBackdropClick}
         style="background: rgba(0,0,0,0.85); backdrop-filter: blur(6px);"
     >
         <div
-            class="modal-panel w-full max-w-2xl max-h-[90vh] flex flex-col rounded-2xl overflow-hidden"
+            class="modal-panel w-full max-w-2xl max-h-[92dvh] md:max-h-[90vh] flex flex-col rounded-t-2xl md:rounded-2xl overflow-hidden"
             style="
                 background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
                 border: 1px solid rgba(239,68,68,0.3);
@@ -158,7 +158,7 @@
                                 >
                                 {#if getFilePath(video)}
                                     <span
-                                        class="truncate max-w-[320px] opacity-60"
+                                        class="truncate max-w-[170px] md:max-w-[320px] opacity-60"
                                         title={getFilePath(video)}
                                     >
                                         {getFilePath(video)}

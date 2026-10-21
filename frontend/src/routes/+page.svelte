@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { onMount } from "svelte";
+    import { onMount, onDestroy } from "svelte";
     import { page } from "$app/stores";
     import { videoStore } from "../stores/videoStore";
     import { toast } from "../stores/toastStore";
@@ -16,6 +16,7 @@
     import VideoGrid from "../components/VideoGrid.svelte";
     import Pagination from "../components/Pagination.svelte";
     import BulkSelectionBar from "../components/BulkSelectionBar.svelte";
+    import FiltersSheet from "../components/FiltersSheet.svelte";
 
     import VideoPlayer from "../components/VideoPlayer.svelte";
     import AutoTagModal from "../components/AutoTagModal.svelte";
@@ -34,6 +35,7 @@
     let isTrimOpen = false;
     let isBulkDeleteOpen = false;
     let isBulkRenameOpen = false;
+    let isFiltersOpen = false;
     let selectedVideo: any = null;
 
     // Composables
@@ -57,6 +59,31 @@
         filters.checkFilterChangesAndLoad();
     }
     $: filters.syncToUrl($videoStore, $page.url.search);
+
+    // Count of non-default filters shown as a badge on the phone filter button
+    $: activeFilterCount =
+        ($tagValue ? 1 : 0) + ($dateFrom || $dateTo ? 1 : 0) + ($sortValue !== "name" ? 1 : 0);
+
+    // Lets global CSS lift floating elements (console button) above the bulk bar.
+    $: if (typeof document !== "undefined") {
+        document.body.classList.toggle("selecting", $selectionMode);
+    }
+    onDestroy(() => {
+        if (typeof document !== "undefined") document.body.classList.remove("selecting");
+    });
+
+    function handlePrevMonth() {
+        const now = new Date();
+        const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const end = new Date(now.getFullYear(), now.getMonth(), 0);
+        filters.setManualDates(start.toISOString().split("T")[0], end.toISOString().split("T")[0]);
+    }
+
+    /** Touch long-press on a card: enter multi-select and pick that card. */
+    function handleLongPress(video: any) {
+        if (!$selectionMode) selection.toggleMode();
+        selection.toggleSelectVideo(video);
+    }
 
     async function handleBulkDeleteConfirm(e: CustomEvent) {
         const { videos } = e.detail;
@@ -100,7 +127,7 @@
     }
 </script>
 
-<div class="min-h-screen bg-gray-900 text-gray-100 p-6">
+<div class="min-h-screen bg-gray-900 text-gray-100 p-3 md:p-6">
     <GalleryHeader
         bind:searchValue={$searchValue}
         bind:sortValue={$sortValue}
@@ -108,6 +135,20 @@
         bind:dateFrom={$dateFrom}
         bind:dateTo={$dateTo}
         tags={$videoStore.tags}
+        activeFilters={activeFilterCount}
+        on:openfilters={() => (isFiltersOpen = true)}
+    />
+
+    <FiltersSheet
+        bind:open={isFiltersOpen}
+        bind:sortValue={$sortValue}
+        bind:tagValue={$tagValue}
+        bind:dateFrom={$dateFrom}
+        bind:dateTo={$dateTo}
+        tags={$videoStore.tags}
+        on:quickdays={(e) => filters.setQuickDays(e.detail)}
+        on:prevmonth={handlePrevMonth}
+        on:cleardates={() => filters.clearDates()}
     />
 
     <StatsChips
@@ -118,12 +159,7 @@
     <GalleryControls
         selectionMode={$selectionMode}
         on:quickdays={(e) => filters.setQuickDays(e.detail)}
-        on:prevmonth={() => {
-            const now = new Date();
-            const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-            const end = new Date(now.getFullYear(), now.getMonth(), 0);
-            filters.setManualDates(start.toISOString().split("T")[0], end.toISOString().split("T")[0]);
-        }}
+        on:prevmonth={handlePrevMonth}
         on:cleardates={() => filters.clearDates()}
         on:randomize={() => ($sortValue = "random")}
         on:autotag={() => (isAutoTagOpen = true)}
@@ -168,6 +204,7 @@
         selectedVideoNames={$selectedVideoNames}
         on:play={(e) => player.handlePlay(e.detail)}
         on:select={(e) => selection.toggleSelectVideo(e.detail)}
+        on:longpress={(e) => handleLongPress(e.detail)}
         on:refresh={() => videoStore.load($searchValue, $sortValue, $videoStore.page, $tagValue)}
         on:details={(e) => {
             selectedVideo = e.detail;

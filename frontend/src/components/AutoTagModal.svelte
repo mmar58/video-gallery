@@ -109,10 +109,10 @@
 
 {#if isOpen}
     <div
-        class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
+        class="fixed inset-0 z-50 flex items-end justify-center bg-black/70 backdrop-blur-sm md:items-center md:p-4"
     >
         <div
-            class="bg-gray-800 rounded-xl shadow-2xl p-6 w-full max-w-md border border-gray-700 relative"
+            class="bg-gray-800 rounded-t-2xl md:rounded-xl shadow-2xl p-5 md:p-6 w-full md:max-w-md max-h-[92dvh] overflow-y-auto border border-gray-700 relative pb-[calc(1.25rem+env(safe-area-inset-bottom))] md:pb-6"
         >
             <button
                 on:click={close}

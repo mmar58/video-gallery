@@ -210,16 +210,16 @@
 {#if isOpen && video}
     <!-- svelte-ignore a11y-click-events-have-key-events -->
     <div
-        class="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+        class="fixed inset-0 z-[60] flex items-end justify-center bg-black/80 backdrop-blur-sm md:items-center md:p-4"
         on:click={close}
     >
         <div
-            class="bg-gray-900 border border-gray-700 rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto flex flex-col md:flex-row"
+            class="bg-gray-900 border border-gray-700 rounded-t-2xl md:rounded-xl shadow-2xl max-w-4xl w-full max-h-[92dvh] md:max-h-[90vh] overflow-y-auto overscroll-contain flex flex-col md:flex-row pb-[env(safe-area-inset-bottom)] md:pb-0"
             on:click|stopPropagation
         >
             <!-- Left: Visuals -->
             <div
-                class="w-full md:w-1/3 bg-black/40 p-6 border-r border-gray-800 space-y-6"
+                class="w-full md:w-1/3 bg-black/40 p-4 md:p-6 border-b md:border-b-0 md:border-r border-gray-800 space-y-5 md:space-y-6"
             >
                 <!-- Main Thumbnail -->
                 <div>
@@ -331,7 +331,7 @@
             </div>
 
             <!-- Right: Metadata & Actions -->
-            <div class="flex-1 p-6 flex flex-col">
+            <div class="flex-1 p-4 md:p-6 flex flex-col">
                 <div class="flex items-start justify-between mb-6">
                     <div>
                         <h2

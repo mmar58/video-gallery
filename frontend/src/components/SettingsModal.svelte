@@ -195,11 +195,11 @@
 {#if isOpen}
     {@const _debugRender = console.log("[settings-debug] modal: render block visible")}
     <div
-        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+        class="fixed inset-0 z-50 flex items-end justify-center bg-black/80 backdrop-blur-sm md:items-center md:p-4"
         transition:fade
     >
         <div
-            class="w-full max-w-lg overflow-hidden rounded-2xl border border-gray-700 bg-gray-900 shadow-2xl"
+            class="w-full md:max-w-lg overflow-hidden rounded-t-2xl md:rounded-2xl border border-gray-700 bg-gray-900 shadow-2xl pb-[env(safe-area-inset-bottom)] md:pb-0"
             transition:fly={{ y: 16 }}
         >
             <div class="flex items-center justify-between border-b border-gray-800 px-5 py-4">
@@ -222,7 +222,7 @@
                 </button>
             </div>
 
-            <div class="space-y-5 px-5 py-5 max-h-[60vh] overflow-y-auto">
+            <div class="space-y-5 px-4 md:px-5 py-5 max-h-[68dvh] md:max-h-[60vh] overflow-y-auto overscroll-contain">
                 {#if loading}
                     <div class="flex items-center gap-2 text-gray-400">
                         <Loader2 class="animate-spin" size={16} /> Loading Ollama settings...

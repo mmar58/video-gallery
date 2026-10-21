@@ -119,3 +119,107 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* ------------------------------------------------------------------ */
+/* Mobile foundation                                                   */
+/* ------------------------------------------------------------------ */
+
+:root {
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  /* Height of the bottom tab bar; set by `body.has-bottom-nav` on phones. */
+  --bottom-nav-h: 0px;
+  /* Extra lift for floating elements while selecting / mini-player is visible. */
+  --sel-offset: 0px;
+  --mini-offset: 0px;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Never allow sideways page scroll (guards against any overflowing row).
+   `clip` on body does not create a scroll container, so `position: sticky` keeps working. */
+html {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+body {
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+/* Removes the 300ms tap delay and double-tap zoom on interactive controls. */
+button,
+a,
+select,
+input,
+label,
+[role="button"] {
+  touch-action: manipulation;
+}
+
+/* Hide scrollbars on horizontally scrolling chip strips. */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  /* 16px+ inputs prevent iOS Safari from zooming the page on focus. */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+
+  body.has-bottom-nav {
+    --bottom-nav-h: 3.5rem;
+    padding-bottom: calc(var(--bottom-nav-h) + var(--safe-bottom));
+  }
+  body.selecting {
+    --sel-offset: 4.5rem;
+  }
+  body.mini-player {
+    --mini-offset: 4.5rem;
+  }
+
+  /* Fixed elements that must sit above the bottom tab bar. */
+  .above-bottom-nav {
+    bottom: calc(var(--bottom-nav-h) + var(--safe-bottom) + 0.75rem) !important;
+  }
+  /* Bulk-selection bar: also clears the mini player. */
+  .bulk-bar {
+    bottom: calc(var(--bottom-nav-h) + var(--safe-bottom) + 0.75rem + var(--mini-offset)) !important;
+  }
+  /* Console trigger / panel: clears bulk bar and mini player. */
+  .console-float {
+    bottom: calc(
+      var(--bottom-nav-h) + var(--safe-bottom) + 0.75rem + var(--mini-offset) + var(--sel-offset)
+    ) !important;
+  }
+}
+
+/* Backdrop blur is expensive on phone GPUs; fall back to the solid tint. */
+@media (pointer: coarse) {
+  .backdrop-blur,
+  .backdrop-blur-sm,
+  .backdrop-blur-md,
+  .backdrop-blur-xl {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

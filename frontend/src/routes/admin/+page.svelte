@@ -3,6 +3,7 @@
     import { authStore } from '../../stores/auth';
     import { Shield, Users, FolderOpen, Check, X, Loader2, Plus, Trash2, Eye, EyeOff } from 'lucide-svelte';
     import { toast } from '../../stores/toastStore';
+    import { confirmDialog } from '../../stores/dialogStore';
     import { SOCKET_URL } from '$lib/socket';
     
     let users = $state([]);
@@ -86,7 +87,7 @@
         e.preventDefault();
         loading = true;
         const token = localStorage.getItem('token');
-        const res = await fetch('http://localhost:3033/api/admin/directories', {
+        const res = await fetch(`${SOCKET_URL}/api/admin/directories`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
             body: JSON.stringify({ name: newDirName, path: newDirPath })
@@ -105,7 +106,12 @@
     }
 
     async function removeDirectory(id) {
-        if (!confirm('Remove this directory?')) return;
+        const ok = await confirmDialog('Remove this directory from gallery management?', {
+            title: 'Remove Directory',
+            confirmLabel: 'Remove',
+            destructive: true,
+        });
+        if (!ok) return;
         const token = localStorage.getItem('token');
         const res = await fetch(`${SOCKET_URL}/api/admin/directories/${id}`, {
             method: 'DELETE',
@@ -151,65 +157,65 @@
     }
 </script>
 
-<div class="min-h-screen bg-[#050505] p-6 lg:p-12 text-gray-200">
+<div class="min-h-screen bg-[#050505] p-3 sm:p-6 lg:p-12 pb-24 md:pb-12 text-gray-200">
     <div class="mx-auto max-w-6xl">
-        <div class="mb-8 flex items-center gap-4">
-            <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-cyan-900/30 text-cyan-400 border border-cyan-900/50">
-                <Shield size={24} />
+        <div class="mb-6 md:mb-8 flex items-center gap-3 md:gap-4">
+            <div class="flex h-10 w-10 md:h-12 md:w-12 items-center justify-center rounded-xl bg-cyan-900/30 text-cyan-400 border border-cyan-900/50 shrink-0">
+                <Shield size={22} class="md:w-6 md:h-6" />
             </div>
             <div>
-                <h1 class="text-2xl font-bold text-white">Admin Dashboard</h1>
-                <p class="text-sm text-gray-400">Manage users, directories, and permissions</p>
+                <h1 class="text-xl md:text-2xl font-bold text-white">Admin Dashboard</h1>
+                <p class="text-xs md:text-sm text-gray-400">Manage users, directories, and permissions</p>
             </div>
         </div>
 
-        <div class="flex gap-4 border-b border-gray-800 mb-8">
+        <div class="flex gap-2 sm:gap-4 border-b border-gray-800 mb-6 md:mb-8 overflow-x-auto scrollbar-none whitespace-nowrap">
             <button 
                 onclick={() => activeTab = 'users'}
-                class="pb-4 px-2 font-medium transition-colors {activeTab === 'users' ? 'text-cyan-400 border-b-2 border-cyan-400' : 'text-gray-400 hover:text-gray-200'}"
+                class="pb-3 md:pb-4 px-2 text-sm md:text-base font-medium transition-colors shrink-0 {activeTab === 'users' ? 'text-cyan-400 border-b-2 border-cyan-400' : 'text-gray-400 hover:text-gray-200'}"
             >
                 Users
             </button>
             <button 
                 onclick={() => activeTab = 'directories'}
-                class="pb-4 px-2 font-medium transition-colors {activeTab === 'directories' ? 'text-cyan-400 border-b-2 border-cyan-400' : 'text-gray-400 hover:text-gray-200'}"
+                class="pb-3 md:pb-4 px-2 text-sm md:text-base font-medium transition-colors shrink-0 {activeTab === 'directories' ? 'text-cyan-400 border-b-2 border-cyan-400' : 'text-gray-400 hover:text-gray-200'}"
             >
                 Directories
             </button>
             {#if selectedUser}
                 <button 
                     onclick={() => activeTab = 'permissions'}
-                    class="pb-4 px-2 font-medium transition-colors {activeTab === 'permissions' ? 'text-cyan-400 border-b-2 border-cyan-400' : 'text-gray-400 hover:text-gray-200'}"
+                    class="pb-3 md:pb-4 px-2 text-sm md:text-base font-medium transition-colors shrink-0 {activeTab === 'permissions' ? 'text-cyan-400 border-b-2 border-cyan-400' : 'text-gray-400 hover:text-gray-200'}"
                 >
                     Permissions: {selectedUser.username}
                 </button>
             {/if}
             <button 
                 onclick={() => activeTab = 'settings'}
-                class="pb-4 px-2 font-medium transition-colors {activeTab === 'settings' ? 'text-cyan-400 border-b-2 border-cyan-400' : 'text-gray-400 hover:text-gray-200'}"
+                class="pb-3 md:pb-4 px-2 text-sm md:text-base font-medium transition-colors shrink-0 {activeTab === 'settings' ? 'text-cyan-400 border-b-2 border-cyan-400' : 'text-gray-400 hover:text-gray-200'}"
             >
                 Global Settings
             </button>
         </div>
 
         {#if activeTab === 'users'}
-            <div class="rounded-xl border border-gray-800 bg-gray-900/30 overflow-hidden">
-                <table class="w-full text-left text-sm">
+            <div class="rounded-xl border border-gray-800 bg-gray-900/30 overflow-x-auto">
+                <table class="w-full text-left text-xs sm:text-sm min-w-[550px]">
                     <thead class="bg-gray-900/60 text-gray-400">
                         <tr>
-                            <th class="px-6 py-4 font-medium">Username</th>
-                            <th class="px-6 py-4 font-medium">Joined</th>
-                            <th class="px-6 py-4 font-medium">Verified</th>
-                            <th class="px-6 py-4 font-medium">Role</th>
-                            <th class="px-6 py-4 font-medium text-right">Actions</th>
+                            <th class="px-4 sm:px-6 py-3 sm:py-4 font-medium">Username</th>
+                            <th class="px-4 sm:px-6 py-3 sm:py-4 font-medium">Joined</th>
+                            <th class="px-4 sm:px-6 py-3 sm:py-4 font-medium">Verified</th>
+                            <th class="px-4 sm:px-6 py-3 sm:py-4 font-medium">Role</th>
+                            <th class="px-4 sm:px-6 py-3 sm:py-4 font-medium text-right">Actions</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-800">
                         {#each users as user}
                             <tr class="hover:bg-gray-800/30 transition-colors">
-                                <td class="px-6 py-4 font-medium text-gray-200">{user.username}</td>
-                                <td class="px-6 py-4 text-gray-500">{new Date(user.created_at).toLocaleDateString()}</td>
-                                <td class="px-6 py-4">
+                                <td class="px-4 sm:px-6 py-3 sm:py-4 font-medium text-gray-200">{user.username}</td>
+                                <td class="px-4 sm:px-6 py-3 sm:py-4 text-gray-500">{new Date(user.created_at).toLocaleDateString()}</td>
+                                <td class="px-4 sm:px-6 py-3 sm:py-4">
                                     <button 
                                         onclick={() => toggleVerify(user)}
                                         class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium {user.verified ? 'bg-green-900/30 text-green-400 border border-green-900/50 hover:bg-green-900/50' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}"
@@ -218,7 +224,7 @@
                                         {user.verified ? 'Verified' : 'Pending'}
                                     </button>
                                 </td>
-                                <td class="px-6 py-4">
+                                <td class="px-4 sm:px-6 py-3 sm:py-4">
                                     <button 
                                         onclick={() => toggleAdmin(user)}
                                         class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium {user.is_admin ? 'bg-purple-900/30 text-purple-400 border border-purple-900/50 hover:bg-purple-900/50' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}"
@@ -227,7 +233,7 @@
                                         {user.is_admin ? 'Admin' : 'User'}
                                     </button>
                                 </td>
-                                <td class="px-6 py-4 text-right">
+                                <td class="px-4 sm:px-6 py-3 sm:py-4 text-right">
                                     <button 
                                         onclick={() => loadPermissions(user)}
                                         class="text-cyan-400 hover:text-cyan-300 font-medium"
@@ -241,17 +247,17 @@
                 </table>
             </div>
         {:else if activeTab === 'directories'}
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div class="lg:col-span-2 space-y-4">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
+                <div class="lg:col-span-2 space-y-3 sm:space-y-4">
                     {#each directories as dir}
-                        <div class="flex items-center justify-between rounded-xl border border-gray-800 bg-gray-900/30 p-5 hover:border-gray-700 transition">
-                            <div class="flex items-start gap-4">
-                                <div class="mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gray-800 text-gray-400">
-                                    <FolderOpen size={20} />
+                        <div class="flex items-center justify-between rounded-xl border border-gray-800 bg-gray-900/30 p-4 sm:p-5 hover:border-gray-700 transition gap-3">
+                            <div class="flex items-start gap-3 sm:gap-4 min-w-0">
+                                <div class="mt-1 flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-lg bg-gray-800 text-gray-400">
+                                    <FolderOpen size={18} />
                                 </div>
-                                <div>
-                                    <h3 class="font-medium text-gray-200">{dir.name}</h3>
-                                    <p class="text-sm text-gray-500 font-mono mt-1">{dir.path}</p>
+                                <div class="min-w-0">
+                                    <h3 class="font-medium text-gray-200 truncate">{dir.name}</h3>
+                                    <p class="text-xs sm:text-sm text-gray-500 font-mono mt-0.5 break-all">{dir.path}</p>
                                     {#if !dir.exists}
                                         <span class="mt-2 inline-flex items-center rounded bg-red-900/30 px-2 py-0.5 text-xs font-medium text-red-400 border border-red-900/50">
                                             Missing on disk
@@ -261,24 +267,25 @@
                             </div>
                             <button 
                                 onclick={() => removeDirectory(dir.id)}
-                                class="rounded-lg p-2 text-gray-500 hover:bg-red-900/30 hover:text-red-400 transition"
+                                class="rounded-lg p-2 text-gray-500 hover:bg-red-900/30 hover:text-red-400 transition shrink-0"
+                                aria-label="Remove directory"
                             >
                                 <Trash2 size={18} />
                             </button>
                         </div>
                     {/each}
                     {#if directories.length === 0}
-                        <div class="rounded-xl border border-gray-800 border-dashed p-12 text-center text-gray-500">
+                        <div class="rounded-xl border border-gray-800 border-dashed p-8 sm:p-12 text-center text-gray-500 text-sm">
                             No directories configured.
                         </div>
                     {/if}
                 </div>
 
-                <div class="rounded-xl border border-gray-800 bg-gray-900/50 p-6 h-fit">
-                    <h3 class="text-lg font-medium text-white mb-4">Add Directory</h3>
+                <div class="rounded-xl border border-gray-800 bg-gray-900/50 p-5 sm:p-6 h-fit">
+                    <h3 class="text-base sm:text-lg font-medium text-white mb-4">Add Directory</h3>
                     <form onsubmit={addDirectory} class="space-y-4">
                         <div>
-                            <label class="block text-sm font-medium text-gray-400 mb-1">Display Name</label>
+                            <label class="block text-xs sm:text-sm font-medium text-gray-400 mb-1">Display Name</label>
                             <input 
                                 type="text" 
                                 bind:value={newDirName} 
@@ -288,7 +295,7 @@
                             >
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-400 mb-1">Absolute Path</label>
+                            <label class="block text-xs sm:text-sm font-medium text-gray-400 mb-1">Absolute Path</label>
                             <input 
                                 type="text" 
                                 bind:value={newDirPath} 
@@ -300,7 +307,7 @@
                         <button 
                             type="submit"
                             disabled={loading}
-                            class="flex w-full items-center justify-center gap-2 rounded-lg bg-cyan-600 p-2.5 text-sm font-medium text-white hover:bg-cyan-500 transition disabled:opacity-50"
+                            class="flex w-full items-center justify-center gap-2 rounded-lg bg-cyan-600 p-3 text-sm font-medium text-white hover:bg-cyan-500 transition disabled:opacity-50 active:scale-[0.99]"
                         >
                             {#if loading}
                                 <Loader2 class="h-4 w-4 animate-spin" />
@@ -313,30 +320,30 @@
                 </div>
             </div>
         {:else if activeTab === 'permissions' && selectedUser}
-            <div class="rounded-xl border border-gray-800 bg-gray-900/30 overflow-hidden max-w-2xl">
-                <table class="w-full text-left text-sm">
+            <div class="rounded-xl border border-gray-800 bg-gray-900/30 overflow-x-auto max-w-2xl">
+                <table class="w-full text-left text-xs sm:text-sm min-w-[380px]">
                     <thead class="bg-gray-900/60 text-gray-400">
                         <tr>
-                            <th class="px-6 py-4 font-medium">Directory</th>
-                            <th class="px-6 py-4 font-medium text-right">Access</th>
+                            <th class="px-4 sm:px-6 py-3 sm:py-4 font-medium">Directory</th>
+                            <th class="px-4 sm:px-6 py-3 sm:py-4 font-medium text-right">Access</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-800">
                         {#each directories as dir}
                             <tr class="hover:bg-gray-800/30 transition-colors">
-                                <td class="px-6 py-4">
+                                <td class="px-4 sm:px-6 py-3 sm:py-4">
                                     <div class="font-medium text-gray-200">{dir.name}</div>
-                                    <div class="text-xs text-gray-500 font-mono mt-0.5">{dir.path}</div>
+                                    <div class="text-xs text-gray-500 font-mono mt-0.5 break-all">{dir.path}</div>
                                 </td>
-                                <td class="px-6 py-4 text-right">
+                                <td class="px-4 sm:px-6 py-3 sm:py-4 text-right">
                                     <button 
                                         onclick={() => togglePermission(dir.id)}
-                                        class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition {isHiddenForUser(dir.id) ? 'bg-red-900/30 text-red-400 hover:bg-red-900/50 border border-red-900/50' : 'bg-green-900/30 text-green-400 hover:bg-green-900/50 border border-green-900/50'}"
+                                        class="inline-flex items-center gap-1.5 rounded-lg px-2.5 sm:px-3 py-1.5 text-xs sm:text-sm font-medium transition {isHiddenForUser(dir.id) ? 'bg-red-900/30 text-red-400 hover:bg-red-900/50 border border-red-900/50' : 'bg-green-900/30 text-green-400 hover:bg-green-900/50 border border-green-900/50'}"
                                     >
                                         {#if isHiddenForUser(dir.id)}
-                                            <EyeOff size={16}/> Hidden
+                                            <EyeOff size={14}/> Hidden
                                         {:else}
-                                            <Eye size={16}/> Visible
+                                            <Eye size={14}/> Visible
                                         {/if}
                                     </button>
                                 </td>
@@ -346,22 +353,22 @@
                 </table>
             </div>
         {:else if activeTab === 'settings'}
-            <div class="rounded-xl border border-gray-800 bg-gray-900/50 p-6 max-w-2xl">
-                <h3 class="text-lg font-medium text-white mb-2">Low Bandwidth Settings</h3>
-                <p class="text-sm text-gray-400 mb-6">Configure the global behavior for low bandwidth mode.</p>
+            <div class="rounded-xl border border-gray-800 bg-gray-900/50 p-5 sm:p-6 max-w-2xl">
+                <h3 class="text-base sm:text-lg font-medium text-white mb-1 md:mb-2">Low Bandwidth Settings</h3>
+                <p class="text-xs sm:text-sm text-gray-400 mb-6">Configure the global behavior for low bandwidth mode.</p>
                 
                 {#if generalSettings}
                     <div class="space-y-6">
-                        <div class="flex items-center justify-between">
+                        <div class="flex items-center justify-between gap-4">
                             <div>
                                 <h4 class="text-sm font-medium text-gray-200">Allow Low Bandwidth Mode</h4>
-                                <p class="text-xs text-gray-500 mt-1">If disabled, users cannot use low bandwidth mode regardless of their preference.</p>
+                                <p class="text-xs text-gray-500 mt-0.5">If disabled, users cannot use low bandwidth mode regardless of their preference.</p>
                             </div>
                             <label class="flex items-center cursor-pointer">
                                 <input 
                                     type="checkbox" 
                                     bind:checked={generalSettings.lowBandwidth.allow}
-                                    class="rounded border-gray-700 bg-gray-950 text-cyan-500 focus:ring-cyan-500" 
+                                    class="rounded border-gray-700 bg-gray-950 text-cyan-500 focus:ring-cyan-500 h-5 w-5" 
                                 />
                             </label>
                         </div>
@@ -382,7 +389,7 @@
                             <button 
                                 onclick={saveGeneralSettings}
                                 disabled={loading}
-                                class="flex items-center justify-center gap-2 rounded-lg bg-cyan-600 px-4 py-2 text-sm font-medium text-white hover:bg-cyan-500 transition disabled:opacity-50"
+                                class="flex items-center justify-center gap-2 rounded-lg bg-cyan-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-cyan-500 transition disabled:opacity-50 active:scale-[0.99]"
                             >
                                 {#if loading}
                                     <Loader2 class="h-4 w-4 animate-spin" />
@@ -392,7 +399,7 @@
                         </div>
                     </div>
                 {:else}
-                    <div class="flex items-center gap-2 text-gray-400">
+                    <div class="flex items-center gap-2 text-gray-400 text-sm">
                         <Loader2 class="animate-spin" size={16} /> Loading settings...
                     </div>
                 {/if}

@@ -171,10 +171,10 @@
 
 {#if isOpen && video}
     <div
-        class="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+        class="fixed inset-0 z-[70] flex items-end justify-center bg-black/80 backdrop-blur-sm md:items-center md:p-4"
     >
         <div
-            class="bg-gray-900 border border-gray-700 rounded-xl shadow-2xl max-w-4xl w-full flex flex-col max-h-[90vh]"
+            class="bg-gray-900 border border-gray-700 rounded-t-2xl md:rounded-xl shadow-2xl max-w-4xl w-full flex flex-col max-h-[94dvh] md:max-h-[90vh] pb-[env(safe-area-inset-bottom)] md:pb-0"
         >
             <!-- Header -->
             <div
@@ -185,7 +185,7 @@
                 >
                     <Scissors class="text-red-500" /> Trim Video:
                     <span
-                        class="text-gray-400 text-base font-normal truncate max-w-[300px]"
+                        class="text-gray-400 text-base font-normal truncate max-w-[170px] md:max-w-[300px]"
                         >{video.name}</span
                     >
                 </h2>

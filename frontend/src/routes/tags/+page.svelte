@@ -2,6 +2,8 @@
     import { onMount } from "svelte";
     import { base } from "$app/paths";
     import { api } from "$lib/api";
+    import { confirmDialog } from "../../stores/dialogStore";
+    import { toast } from "../../stores/toastStore";
     import { Trash2, Edit2, Ban, Search, Tag } from "lucide-svelte";
     import { fade } from "svelte/transition";
 
@@ -34,39 +36,50 @@
         if (!tagToRename || !newTagName) return;
         try {
             await api.renameTag(tagToRename.name, newTagName);
+            toast.success(`Renamed tag to "${newTagName}"`);
             loadTags();
             closeRenameModal();
         } catch (e) {
-            alert("Failed to rename tag");
+            toast.error("Failed to rename tag");
         }
     }
 
     async function handleDelete(tag) {
-        if (
-            confirm(
-                `Are you sure you want to delete tag "${tag.name}" from ALL videos?`,
-            )
-        ) {
+        const ok = await confirmDialog(
+            `Are you sure you want to delete tag "${tag.name}" from ALL videos?`,
+            {
+                title: "Delete Tag",
+                confirmLabel: "Delete",
+                destructive: true,
+            }
+        );
+        if (ok) {
             try {
                 await api.deleteTag(tag.name);
+                toast.success(`Deleted tag "${tag.name}"`);
                 loadTags();
             } catch (e) {
-                alert("Failed to delete tag");
+                toast.error("Failed to delete tag");
             }
         }
     }
 
     async function handleBlacklist(tag) {
-        if (
-            confirm(
-                `Blacklist "${tag.name}"? This will remove it from all videos and prevent it from being generated again.`,
-            )
-        ) {
+        const ok = await confirmDialog(
+            `Blacklist "${tag.name}"? This will remove it from all videos and prevent it from being generated again.`,
+            {
+                title: "Blacklist Tag",
+                confirmLabel: "Blacklist",
+                destructive: true,
+            }
+        );
+        if (ok) {
             try {
                 await api.blacklistTag(tag.name);
+                toast.success(`Blacklisted tag "${tag.name}"`);
                 loadTags();
             } catch (e) {
-                alert("Failed to blacklist tag");
+                toast.error("Failed to blacklist tag");
             }
         }
     }
@@ -88,18 +101,18 @@
     );
 </script>
 
-<div class="min-h-screen bg-gray-900 text-gray-100 p-6">
+<div class="min-h-screen bg-gray-900 text-gray-100 p-3 md:p-6 pb-20">
     <div class="max-w-7xl mx-auto">
-        <header class="flex justify-between items-center mb-8">
-            <div class="flex items-center gap-3">
-                <Tag class="text-red-500" size={32} />
+        <header class="flex justify-between items-center mb-6 md:mb-8">
+            <div class="flex items-center gap-2 md:gap-3">
+                <Tag class="text-red-500" size={26} />
                 <h1
-                    class="text-3xl font-bold bg-gradient-to-r from-red-500 to-purple-500 bg-clip-text text-transparent"
+                    class="text-2xl md:text-3xl font-bold bg-gradient-to-r from-red-500 to-purple-500 bg-clip-text text-transparent"
                 >
                     Tags Manager
                 </h1>
             </div>
-            <a href="{base}/" class="text-gray-400 hover:text-white underline"
+            <a href="{base}/" class="text-sm md:text-base text-gray-400 hover:text-white underline"
                 >Back to Gallery</a
             >
         </header>
@@ -192,29 +205,29 @@
 <!-- Rename Modal -->
 {#if isRenameOpen}
     <div
-        class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
+        class="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/70 backdrop-blur-sm md:p-4"
         transition:fade={{ duration: 200 }}
     >
         <div
-            class="bg-gray-800 rounded-xl p-6 w-full max-w-md border border-gray-700 shadow-2xl"
+            class="bg-gray-800 rounded-t-2xl md:rounded-xl p-5 md:p-6 w-full md:max-w-md border border-gray-700 shadow-2xl pb-[calc(1.5rem+env(safe-area-inset-bottom))] md:pb-6"
         >
-            <h3 class="text-xl font-bold mb-4 text-white">Rename Tag</h3>
+            <h3 class="text-lg md:text-xl font-bold mb-4 text-white">Rename Tag</h3>
             <input
                 type="text"
                 bind:value={newTagName}
-                class="w-full bg-gray-900 border border-gray-600 rounded px-4 py-2 text-white focus:ring-2 focus:ring-red-500 focus:outline-none mb-6"
+                class="w-full bg-gray-900 border border-gray-600 rounded px-4 py-3 text-base text-white focus:ring-2 focus:ring-red-500 focus:outline-none mb-6"
                 placeholder="New name..."
                 autofocus
             />
             <div class="flex justify-end gap-3">
                 <button
                     on:click={closeRenameModal}
-                    class="px-4 py-2 rounded text-gray-400 hover:text-white hover:bg-gray-700 transition"
+                    class="px-4 py-2.5 rounded text-gray-400 hover:text-white hover:bg-gray-700 transition"
                     >Cancel</button
                 >
                 <button
                     on:click={handleRename}
-                    class="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded font-medium transition"
+                    class="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded font-medium transition active:opacity-80"
                     >Save</button
                 >
             </div>

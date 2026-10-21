@@ -19,12 +19,15 @@
 </script>
 
 {#if stats && stats.distributions}
-    <div class="max-w-7xl mx-auto mb-4 space-y-4">
-        <div class="flex flex-wrap gap-2 items-center">
-            <span class="text-sm text-gray-400 mr-2">Overview:</span>
+    <div class="max-w-7xl mx-auto mb-3 md:mb-4 space-y-4">
+        <!-- Single horizontally scrollable strip on phones, wrapping row on desktop -->
+        <div
+            class="no-scrollbar -mx-3 flex flex-nowrap items-center gap-2 overflow-x-auto px-3 md:mx-0 md:flex-wrap md:overflow-visible md:px-0"
+        >
+            <span class="mr-2 hidden shrink-0 text-sm text-gray-400 md:inline">Overview:</span>
             {#each Object.entries(stats.distributions).sort().reverse().slice(0, 6) as [month, count]}
                 <button
-                    class="px-3 py-1 bg-gray-800 border border-gray-700 rounded-full text-xs hover:bg-gray-700 hover:border-blue-500 transition flex items-center gap-2"
+                    class="flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-gray-700 bg-gray-800 px-3 py-1.5 text-xs transition hover:border-blue-500 hover:bg-gray-700 active:bg-gray-700 md:py-1"
                     on:click={() => handleMonthClick(month)}
                 >
                     <span class="text-gray-300">

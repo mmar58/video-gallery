@@ -45,11 +45,11 @@
 
 {#if isOpen}
     <div
-        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+        class="fixed inset-0 z-50 flex items-end justify-center bg-black/80 backdrop-blur-sm md:items-center md:p-4"
         transition:fade
     >
         <div
-            class="bg-gray-900 border border-gray-700 rounded-xl shadow-2xl w-full max-w-md flex flex-col max-h-[80vh]"
+            class="bg-gray-900 border border-gray-700 rounded-t-2xl md:rounded-xl shadow-2xl w-full md:max-w-md flex flex-col max-h-[88dvh] md:max-h-[80vh]"
             transition:fly={{ y: 20 }}
         >
             <!-- Header -->

@@ -37,14 +37,15 @@
 </script>
 
 <div
-    class="fixed top-4 right-4 z-[9999] flex flex-col gap-2 pointer-events-none"
+    class="fixed top-3 left-3 right-3 z-[9999] flex flex-col gap-2 pointer-events-none md:left-auto md:right-4 md:top-4"
+    style="top: calc(env(safe-area-inset-top, 0px) + 0.75rem);"
 >
     {#each $toast as t (t.id)}
         <div
-            class="pointer-events-auto flex items-center gap-3 px-4 py-3 rounded shadow-lg min-w-[300px] {getColor(
+            class="pointer-events-auto flex items-center gap-3 px-4 py-3 rounded shadow-lg md:min-w-[300px] {getColor(
                 t.type,
             )}"
-            transition:fly={{ x: 300, duration: 300 }}
+            transition:fly={{ y: -40, duration: 250 }}
         >
             <svelte:component this={getIcon(t.type)} size={20} />
             <p class="flex-1 text-sm font-medium">{t.message}</p>

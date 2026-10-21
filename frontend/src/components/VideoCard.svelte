@@ -2,8 +2,18 @@
     import { createEventDispatcher } from "svelte";
     import { goto } from "$app/navigation";
     import { base } from "$app/paths";
-    import { videoStore } from "../stores/videoStore";
     import { api } from "../lib/api";
+    import { isTouch, isMobile } from "../lib/device";
+    import { videoMenu } from "../stores/uiStore";
+    import {
+        likeVideo,
+        renameVideo,
+        addTagToVideo,
+        toggleHideVideo,
+        deleteVideo,
+        generateThumbnail as doGenerateThumbnail,
+        generatePreview as doGeneratePreview,
+    } from "../lib/videoActions";
     import {
         Play,
         Heart,
@@ -15,15 +25,19 @@
         Scissors,
         EyeOff,
         Eye,
+        Clock,
+        EllipsisVertical,
     } from "lucide-svelte";
-    import { toast } from "../stores/toastStore";
-    import { logStore } from "../stores/logStore";
     import { authStore } from "../stores/auth";
 
     export let video: any; // Ideally define a proper Video interface
     export let hoverMode = "player"; // 'player' | 'preview'
     export let selectionMode = false;
     export let isSelected = false;
+    /** Smaller layout used by the 2-column phone grid. */
+    export let compact = false;
+    /** Long-press (touch) emits `longpress` so the page can enter selection mode. */
+    export let allowLongPress = false;
 
     const dispatch = createEventDispatcher();
     let videoRef: HTMLVideoElement;
@@ -69,6 +83,8 @@
     }
 
     function handleMouseEnter() {
+        // Touch browsers emulate mouseenter on tap; don't start video streaming for that.
+        if ($isTouch) return;
         isHovering = true;
         if (pauseTimeout) clearTimeout(pauseTimeout);
 
@@ -103,14 +119,12 @@
 
     function handleLike(e: Event) {
         e.stopPropagation();
-        videoStore.toggleLike(video.name);
+        likeVideo(video);
     }
 
     function handleDelete(e: Event) {
         e.stopPropagation();
-        if (confirm(`Delete ${video.name}?`)) {
-            videoStore.remove(video.name);
-        }
+        deleteVideo(video);
     }
 
     function handleCheckboxClick(e: Event) {
@@ -120,19 +134,67 @@
 
     function handleRename(e: Event) {
         e.stopPropagation();
-        const defaultName = video.displayName || video.name.split('::').pop() || video.name;
-        const newName = prompt("Rename video:", defaultName);
-        if (newName && newName !== defaultName && newName !== video.name) {
-            videoStore.rename(video.name, newName);
-        }
+        renameVideo(video);
     }
 
     function handleAddTag(e: Event) {
         e.stopPropagation();
-        const tag = prompt("Enter new tag:");
-        if (tag) {
-            videoStore.addTag(video.name, tag).then(() => dispatch("refresh"));
+        addTagToVideo(video, () => dispatch("refresh"));
+    }
+
+    /* Touch: open the shared action sheet instead of the hover-only overlay */
+    function openMenu(e: Event) {
+        e.stopPropagation();
+        videoMenu.set({
+            video,
+            onTrim: () => dispatch("trim", video),
+            onDetails: () => dispatch("details", video),
+            onRefresh: () => dispatch("refresh"),
+        });
+    }
+
+    /* Touch: long-press enters multi-select */
+    let longPressTimer: any = null;
+    let longPressed = false;
+    let pressX = 0;
+    let pressY = 0;
+
+    function handlePointerDown(e: PointerEvent) {
+        if (e.pointerType !== "touch" || !allowLongPress) return;
+        longPressed = false;
+        pressX = e.clientX;
+        pressY = e.clientY;
+        clearTimeout(longPressTimer);
+        longPressTimer = setTimeout(() => {
+            longPressed = true;
+            navigator.vibrate?.(15);
+            dispatch("longpress", video);
+            // Safety: never swallow a later unrelated tap.
+            setTimeout(() => (longPressed = false), 700);
+        }, 500);
+    }
+
+    function handlePointerMove(e: PointerEvent) {
+        if (longPressTimer && Math.hypot(e.clientX - pressX, e.clientY - pressY) > 10) {
+            cancelLongPress();
         }
+    }
+
+    function cancelLongPress() {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+    }
+
+    function handleContextMenu(e: Event) {
+        if ($isTouch && allowLongPress) e.preventDefault();
+    }
+
+    function handleCardClick() {
+        if (longPressed) {
+            longPressed = false;
+            return;
+        }
+        selectionMode ? dispatch("select", video) : dispatch("play", video);
     }
 
     // Tag Actions
@@ -147,44 +209,12 @@
 
     async function generateThumbnail(e: Event) {
         e.stopPropagation();
-        try {
-            toast.info(`Generating thumbnail for ${video.name}...`);
-            logStore.add(`Generating thumbnail for ${video.name}...`);
-            await api.generateThumbnail(video.name);
-            thumbnailError = false;
-
-            // Force refresh image
-            const img = document.querySelector(
-                `img[data-vid="${video.name}"]`,
-            ) as HTMLImageElement;
-            if (img)
-                img.src = api.getThumbnailUrl(video.name) + "?t=" + Date.now();
-
-            toast.success("Thumbnail generated!");
-            logStore.add(`Thumbnail generated for ${video.name}`, "success");
-        } catch (err: any) {
-            toast.error("Failed to generate thumbnail");
-            logStore.add(
-                `Error generating thumbnail for ${video.name}: ${err.message}`,
-                "error",
-            );
-        }
+        if (await doGenerateThumbnail(video)) thumbnailError = false;
     }
 
     function handleHide(e: Event) {
         e.stopPropagation();
-        if (video.hideUntil && video.hideUntil > Date.now()) {
-            // Already hidden, unhide
-            videoStore.hideVideo(video.name, 0);
-        } else {
-            const daysStr = prompt("Hide for how many days?", "7");
-            if (daysStr) {
-                const days = parseInt(daysStr, 10);
-                if (!isNaN(days) && days > 0) {
-                    videoStore.hideVideo(video.name, days);
-                }
-            }
-        }
+        toggleHideVideo(video);
     }
 
     /* Animated Preview Logic */
@@ -193,7 +223,7 @@
 
     function handleMouseMove(e: MouseEvent) {
         // Only run logic if in preview mode OR if we just want the visual but hoverMode dictates interaction
-        if (hoverMode !== "preview" || !previewLoaded) return;
+        if ($isTouch || hoverMode !== "preview" || !previewLoaded) return;
 
         const target = e.currentTarget as HTMLElement;
         const rect = target.getBoundingClientRect();
@@ -229,52 +259,58 @@
 
     async function generatePreview(e: Event) {
         e.stopPropagation();
-        try {
-            toast.info(`Generating preview for ${video.name}...`);
-            logStore.add(`Generating preview for ${video.name}...`);
-            await api.generatePreview(video.name);
+        await doGeneratePreview(video, () => {
             triedLoadingPreview = false;
             checkPreview();
-
-            toast.success("Preview generated! Hover to see effect.");
-            logStore.add(`Preview generated for ${video.name}`, "success");
-        } catch (err: any) {
-            toast.error("Failed to generate preview");
-            logStore.add(
-                `Error generating preview for ${video.name}: ${err.message}`,
-                "error",
-            );
-        }
+        });
     }
 </script>
 
 <!-- svelte-ignore a11y-click-events-have-key-events -->
 <div
-    class="relative group bg-gray-900 rounded-lg overflow-hidden shadow-lg cursor-pointer transition-transform hover:scale-105"
+    class="relative group bg-gray-900 rounded-lg overflow-hidden shadow-lg cursor-pointer transition-transform {$isTouch
+        ? 'select-none active:scale-[0.98]'
+        : 'hover:scale-105'}"
     role="button"
     tabindex="0"
     on:mouseenter={handleMouseEnter}
     on:mouseleave={handleMouseLeave}
     on:mousemove={handleMouseMove}
-    on:click={() =>
-        selectionMode ? dispatch("select", video) : dispatch("play", video)}
-    style={isSelected
-        ? "outline: 2px solid #ef4444; outline-offset: 2px; box-shadow: 0 0 0 4px rgba(239,68,68,0.15);"
-        : ""}
+    on:pointerdown={handlePointerDown}
+    on:pointermove={handlePointerMove}
+    on:pointerup={cancelLongPress}
+    on:pointerleave={cancelLongPress}
+    on:pointercancel={cancelLongPress}
+    on:contextmenu={handleContextMenu}
+    on:click={handleCardClick}
+    style="{isSelected
+        ? 'outline: 2px solid #ef4444; outline-offset: 2px; box-shadow: 0 0 0 4px rgba(239,68,68,0.15);'
+        : ''}{$isTouch ? ' -webkit-touch-callout: none;' : ''}"
 >
     <!-- Top Info Bar (Always Visible) -->
     <div
         class="px-3 py-2 bg-gray-800/80 border-b border-gray-700/50 flex flex-col gap-0.5"
     >
         <div
-            class="text-[0.65rem] font-medium text-gray-300 flex justify-between"
+            class="text-[0.65rem] font-medium text-gray-300 flex justify-between gap-2"
         >
-            <span>Created: {timeAgo(video.created)}</span>
-            <span
-                >Viewed: {video.lastViewTime
-                    ? timeAgo(video.lastViewTime)
-                    : "Never"}</span
-            >
+            {#if compact}
+                <span class="flex items-center gap-1 truncate" title="Created"
+                    ><Clock size={10} />{timeAgo(video.created)}</span
+                >
+                <span class="flex items-center gap-1 truncate" title="Last viewed"
+                    ><Eye size={10} />{video.lastViewTime
+                        ? timeAgo(video.lastViewTime)
+                        : "Never"}</span
+                >
+            {:else}
+                <span>Created: {timeAgo(video.created)}</span>
+                <span
+                    >Viewed: {video.lastViewTime
+                        ? timeAgo(video.lastViewTime)
+                        : "Never"}</span
+                >
+            {/if}
         </div>
         <!-- {#if video.lastViewTime}
             <div class="text-[0.55rem] text-gray-400">
@@ -341,7 +377,7 @@
             <div
                 class="absolute inset-0 flex items-center justify-center pointer-events-none opacity-50 transition-opacity"
             >
-                <Play size={48} class="text-white fill-white" />
+                <Play size={compact ? 32 : 48} class="text-white fill-white" />
             </div>
         {/if}
 
@@ -349,7 +385,9 @@
         {#if selectionMode}
             <!-- svelte-ignore a11y-click-events-have-key-events -->
             <div
-                class="absolute top-10 left-2 z-40"
+                class="absolute z-40 {$isTouch
+                    ? 'top-1 left-1 p-2'
+                    : 'top-10 left-2'}"
                 on:click={handleCheckboxClick}
             >
                 <div
@@ -393,7 +431,37 @@
             ></div>
         {/if}
 
-        <!-- Actions Overlay -->
+        <!-- Actions: touch gets always-visible like + menu; desktop keeps the hover overlay -->
+        {#if $isTouch || $isMobile}
+            {#if !selectionMode}
+                <div class="absolute top-2 right-2 z-40 flex gap-2">
+                    <button
+                        on:click={handleLike}
+                        class="flex items-center justify-center rounded-full bg-black/60 text-white active:bg-red-500/80 {compact
+                            ? 'h-9 min-w-9 px-2'
+                            : 'h-10 min-w-10 px-2.5'}"
+                        aria-label={video.likes > 0 ? `${video.likes} likes` : "Like"}
+                    >
+                        <Heart
+                            size={compact ? 16 : 18}
+                            class={video.likes > 0 ? "fill-red-500 text-red-500" : ""}
+                        />
+                        {#if video.likes > 0}
+                            <span class="ml-1 text-xs font-bold">{video.likes}</span>
+                        {/if}
+                    </button>
+                    <button
+                        on:click={openMenu}
+                        class="flex items-center justify-center rounded-full bg-black/60 text-white active:bg-gray-500/80 {compact
+                            ? 'h-9 w-9'
+                            : 'h-10 w-10'}"
+                        aria-label="More actions"
+                    >
+                        <EllipsisVertical size={compact ? 16 : 18} />
+                    </button>
+                </div>
+            {/if}
+        {:else}
         <div
             class="absolute top-10 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-40 flex-wrap justify-end max-w-[80%]"
         >
@@ -481,6 +549,7 @@
                 <Info size={16} />
             </button>
         </div>
+        {/if}
 
         <!-- Bottom Info Bar (Overlay) -->
         <div
@@ -494,19 +563,26 @@
 
     <!-- Info -->
     <div class="p-3">
-        <h3
-            class="text-white text-sm font-medium truncate mb-2"
-            title={video.name}
-        >
-            {video.name}
-        </h3>
+        <div class="mb-2 flex items-baseline justify-between gap-2">
+            <h3
+                class="text-white text-sm font-medium truncate"
+                title={video.name}
+            >
+                {video.name}
+            </h3>
+            {#if $isTouch}
+                <span class="shrink-0 text-[11px] text-gray-500">
+                    {(video.size / 1024 / 1024).toFixed(1)} MB
+                </span>
+            {/if}
+        </div>
 
         <!-- Tags -->
         {#if video.tags && video.tags.length > 0}
             <div class="flex flex-wrap gap-1.5 relative">
                 {#each video.tags as tag}
                     <button
-                        class="text-[11px] bg-gray-800 border border-gray-700 hover:border-gray-500 text-gray-300 px-2 py-0.5 rounded-full transition cursor-pointer select-none flex items-center gap-1 group/tag"
+                        class="text-[11px] bg-gray-800 border border-gray-700 hover:border-gray-500 text-gray-300 px-2.5 py-1 md:px-2 md:py-0.5 rounded-full transition cursor-pointer select-none flex items-center gap-1 group/tag"
                         on:click={(e) => handleTagClick(e, tag)}
                     >
                         {tag}

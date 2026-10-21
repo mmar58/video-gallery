@@ -13,9 +13,12 @@
         Heart,
         Scissors,
         Info,
+        EllipsisVertical,
     } from "lucide-svelte";
     import { toast } from "../stores/toastStore";
     import { logStore } from "../stores/logStore";
+    import { isTouch, isMobile } from "../lib/device";
+    import { videoMenu } from "../stores/uiStore";
 
     export let video: any; // Ideally define a proper Video interface
 
@@ -25,11 +28,22 @@
     let previewBgPosition = "0% 0%";
     let activeTagMenu: string | null = null;
 
+    function openMenu(e: Event) {
+        e.stopPropagation();
+        videoMenu.set({
+            video,
+            onTrim: () => dispatch("trim", video),
+            onDetails: () => dispatch("details", video),
+            onRefresh: () => dispatch("refresh"),
+        });
+    }
+
     // --- Preview Logic ---
     let triedLoadingPreview = false;
     $: processPreview = isHovering && previewLoaded;
 
     function handleMouseEnter() {
+        if ($isTouch) return;
         isHovering = true;
         if (!triedLoadingPreview) {
             triedLoadingPreview = true;
@@ -47,7 +61,7 @@
     }
 
     function handleMouseMove(e: MouseEvent) {
-        if (!processPreview) return;
+        if ($isTouch || !processPreview) return;
 
         const target = e.currentTarget as HTMLElement;
         const rect = target.getBoundingClientRect();
@@ -180,8 +194,11 @@
 </script>
 
 <!-- svelte-ignore a11y-click-events-have-key-events -->
+<!-- svelte-ignore a11y-click-events-have-key-events -->
 <div
-    class="relative group bg-gray-900 rounded-lg overflow-hidden shadow-lg cursor-pointer transition-transform hover:scale-105"
+    class="relative group bg-gray-900 rounded-lg overflow-hidden shadow-lg cursor-pointer transition-transform {$isTouch
+        ? 'select-none active:scale-[0.98]'
+        : 'hover:scale-105'}"
     role="button"
     tabindex="0"
     on:mouseenter={handleMouseEnter}
@@ -227,74 +244,101 @@
             </div>
         {/if}
 
-        <!-- Actions Overlay -->
-        <div
-            class="absolute top-1 right-1 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-20"
-        >
-            <!-- Like Button -->
-            <button
-                on:click={(e) => {
-                    e.stopPropagation();
-                    handleLike(e);
-                }}
-                class="bg-black/60 p-1.5 rounded-full hover:bg-red-500/80 text-white backdrop-blur-sm transition flex items-center"
-                title={video.likes > 0 ? `${video.likes} Likes` : "Like"}
+        <!-- Actions: touch gets always-visible like + more menu; desktop keeps the hover overlay -->
+        {#if $isTouch || $isMobile}
+            <div class="absolute top-1.5 right-1.5 z-20 flex gap-1.5">
+                <button
+                    on:click={(e) => {
+                        e.stopPropagation();
+                        handleLike(e);
+                    }}
+                    class="bg-black/60 h-8 px-2 rounded-full active:bg-red-500/80 text-white backdrop-blur-sm transition flex items-center justify-center"
+                    aria-label={video.likes > 0 ? `${video.likes} Likes` : "Like"}
+                >
+                    <Heart
+                        size={14}
+                        class={video.likes > 0 ? "fill-red-500 text-red-500" : ""}
+                    />
+                    {#if video.likes > 0}
+                        <span class="text-[10px] font-bold ml-1">{video.likes}</span>
+                    {/if}
+                </button>
+                <button
+                    on:click={openMenu}
+                    class="bg-black/60 h-8 w-8 rounded-full active:bg-gray-500/80 text-white backdrop-blur-sm transition flex items-center justify-center"
+                    aria-label="More actions"
+                >
+                    <EllipsisVertical size={16} />
+                </button>
+            </div>
+        {:else}
+            <!-- Actions Overlay for desktop hover -->
+            <div
+                class="absolute top-1 right-1 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-20"
             >
-                <Heart
-                    size={14}
-                    class={video.likes > 0 ? "fill-red-500 text-red-500" : ""}
-                />
-                {#if video.likes > 0}
-                    <span class="text-[10px] font-bold ml-1">{video.likes}</span
-                    >
-                {/if}
-            </button>
-            <!-- Thumbnail Gen -->
-            <button
-                on:click={(e) => {
-                    e.stopPropagation();
-                    generateThumbnail(e);
-                }}
-                class="bg-black/60 p-1.5 rounded-full hover:bg-purple-500/80 text-white backdrop-blur-sm transition"
-                title="Generate Thumbnail"
-            >
-                <ImageIcon size={14} />
-            </button>
-            <!-- Preview Gen -->
-            <button
-                on:click={(e) => {
-                    e.stopPropagation();
-                    generatePreview(e);
-                }}
-                class="bg-black/60 p-1.5 rounded-full hover:bg-orange-500/80 text-white backdrop-blur-sm transition"
-                title="Generate Animated Preview"
-            >
-                <ImageIcon size={14} class="text-orange-300" />
-            </button>
-            <!-- Trim -->
-            <button
-                on:click={(e) => {
-                    e.stopPropagation();
-                    dispatch("trim", video);
-                }}
-                class="bg-black/60 p-1.5 rounded-full hover:bg-yellow-500/80 text-white backdrop-blur-sm transition"
-                title="Trim Video"
-            >
-                <Scissors size={14} />
-            </button>
-            <!-- Info -->
-            <button
-                on:click={(e) => {
-                    e.stopPropagation();
-                    dispatch("details", video);
-                }}
-                class="bg-black/60 p-1.5 rounded-full hover:bg-gray-500/80 text-white backdrop-blur-sm transition"
-                title="Video Details"
-            >
-                <Info size={14} />
-                <!-- Typo here? 'Infor' -> 'Info' is what I imported probably? No, I imported 'Info'. Wait, check previous file content. -->
-            </button>
-        </div>
+                <!-- Like Button -->
+                <button
+                    on:click={(e) => {
+                        e.stopPropagation();
+                        handleLike(e);
+                    }}
+                    class="bg-black/60 p-1.5 rounded-full hover:bg-red-500/80 text-white backdrop-blur-sm transition flex items-center"
+                    title={video.likes > 0 ? `${video.likes} Likes` : "Like"}
+                >
+                    <Heart
+                        size={14}
+                        class={video.likes > 0 ? "fill-red-500 text-red-500" : ""}
+                    />
+                    {#if video.likes > 0}
+                        <span class="text-[10px] font-bold ml-1">{video.likes}</span>
+                    {/if}
+                </button>
+                <!-- Thumbnail Gen -->
+                <button
+                    on:click={(e) => {
+                        e.stopPropagation();
+                        generateThumbnail(e);
+                    }}
+                    class="bg-black/60 p-1.5 rounded-full hover:bg-purple-500/80 text-white backdrop-blur-sm transition"
+                    title="Generate Thumbnail"
+                >
+                    <ImageIcon size={14} />
+                </button>
+                <!-- Preview Gen -->
+                <button
+                    on:click={(e) => {
+                        e.stopPropagation();
+                        generatePreview(e);
+                    }}
+                    class="bg-black/60 p-1.5 rounded-full hover:bg-orange-500/80 text-white backdrop-blur-sm transition"
+                    title="Generate Animated Preview"
+                >
+                    <ImageIcon size={14} class="text-orange-300" />
+                </button>
+                <!-- Trim -->
+                <button
+                    on:click={(e) => {
+                        e.stopPropagation();
+                        dispatch("trim", video);
+                    }}
+                    class="bg-black/60 p-1.5 rounded-full hover:bg-yellow-500/80 text-white backdrop-blur-sm transition"
+                    title="Trim Video"
+                >
+                    <Scissors size={14} />
+                </button>
+                <!-- Info -->
+                <button
+                    on:click={(e) => {
+                        e.stopPropagation();
+                        dispatch("details", video);
+                    }}
+                    class="bg-black/60 p-1.5 rounded-full hover:bg-gray-500/80 text-white backdrop-blur-sm transition"
+                    title="Video Details"
+                >
+                    <Info size={14} />
+                </button>
+            </div>
+        {/if}
 
         <!-- Duration/Size Badge -->
         <div
