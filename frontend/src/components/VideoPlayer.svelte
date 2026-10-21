@@ -1,6 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher, onMount, onDestroy } from "svelte";
-  import { ChevronDown, ChevronUp, Play, Pause, X } from "lucide-svelte";
+  import { ChevronDown, ChevronUp, Play, Pause, X, Maximize, Minimize } from "lucide-svelte";
   import { api } from "../lib/api";
   import { isMobile } from "../lib/device";
   import { mobilePlayerId } from "../stores/uiStore";
@@ -30,17 +30,76 @@
   let dockHeight = 0;
   let mounted = false;
 
+  // Fullscreen tracking & layout lock:
+  // When a video is in fullscreen, rotating the phone (portrait <-> landscape) must
+  // NEVER unmount the <video> element. We lock isPhoneMode while in fullscreen so
+  // Svelte doesn't swap branches or tear down the media element during orientation change.
+  let isFullscreen = false;
+  let isPhoneMode = false;
+
+  function checkFullscreen(): boolean {
+    if (typeof document === "undefined") return false;
+    const docFs = !!(
+      document.fullscreenElement ||
+      (document as any).webkitFullscreenElement ||
+      (document as any).mozFullScreenElement ||
+      (document as any).msFullscreenElement
+    );
+    const videoFs = !!(videoEl && ((videoEl as any).webkitDisplayingFullscreen || (videoEl as any).webkitCurrentPlaybackTargetIsWireless));
+    return docFs || videoFs;
+  }
+
+  function handleFullscreenChange() {
+    const wasFullscreen = isFullscreen;
+    isFullscreen = checkFullscreen();
+    if (wasFullscreen && !isFullscreen) {
+      isPhoneMode = $isMobile;
+    }
+  }
+
+  // Only update isPhoneMode when NOT in fullscreen
+  $: if (!isFullscreen) {
+    isPhoneMode = $isMobile;
+  }
+
+  function toggleFullscreen() {
+    if (!videoEl) return;
+    if (checkFullscreen()) {
+      if (document.exitFullscreen) {
+        document.exitFullscreen().catch(() => {});
+      } else if ((document as any).webkitExitFullscreen) {
+        (document as any).webkitExitFullscreen();
+      } else if ((videoEl as any).webkitExitFullscreen) {
+        (videoEl as any).webkitExitFullscreen();
+      }
+    } else {
+      if (videoEl.requestFullscreen) {
+        videoEl.requestFullscreen().catch(() => {
+          if ((videoEl as any).webkitEnterFullscreen) {
+            (videoEl as any).webkitEnterFullscreen();
+          }
+        });
+      } else if ((videoEl as any).webkitEnterFullscreen) {
+        (videoEl as any).webkitEnterFullscreen();
+      } else if ((videoEl as any).webkitRequestFullscreen) {
+        (videoEl as any).webkitRequestFullscreen();
+      }
+    }
+  }
+
   onMount(() => {
     mounted = true;
+    isPhoneMode = $isMobile;
     if (typeof window !== "undefined") {
       const vw = window.innerWidth;
       const vh = window.innerHeight;
 
       // Responsive width: 90% on mobile, max 640px default
-      if (vw < 768) {
+      if ($isMobile) {
         width = Math.min(vw * 0.9, 640);
         left = (vw - width) / 2;
         top = 60 + Math.random() * 20;
+        mobilePlayerId.set(myId);
       } else {
         width = 640;
         left = 100 + Math.random() * 50;
@@ -53,32 +112,41 @@
       left = Math.max(0, left);
       top = Math.max(0, top);
 
-      // Phones: claim the single player slot (other players close themselves).
-      if (vw < 768) mobilePlayerId.set(myId);
+      document.addEventListener("fullscreenchange", handleFullscreenChange);
+      document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
+      document.addEventListener("mozfullscreenchange", handleFullscreenChange);
+      document.addEventListener("MSFullscreenChange", handleFullscreenChange);
     }
   });
 
-  // One player at a time on phones.
-  $: if (mounted && $isMobile && $mobilePlayerId !== null && $mobilePlayerId !== myId) {
+  // One player at a time on phones (never close while user is watching in fullscreen).
+  $: if (mounted && !isFullscreen && $isMobile && $mobilePlayerId !== null && $mobilePlayerId !== myId) {
     dispatch("close");
   }
 
   // Reserve space under the docked player so page content isn't hidden behind it,
   // and flag the mini player so floating elements can lift above it.
-  $: if (typeof document !== "undefined") applyDock($isMobile, minimized, dockHeight);
+  $: if (typeof document !== "undefined") applyDock(isPhoneMode, minimized, dockHeight);
 
   function applyDock(mobile: boolean, isMin: boolean, height: number) {
-    if (!mobile) return;
+    if (!mobile || isFullscreen) return;
     document.body.dataset.playerOwner = String(myId);
     document.body.style.paddingTop = !isMin && height ? `${height}px` : "";
     document.body.classList.toggle("mini-player", isMin);
   }
 
   onDestroy(() => {
-    if (typeof document !== "undefined" && document.body.dataset.playerOwner === String(myId)) {
-      document.body.style.paddingTop = "";
-      document.body.classList.remove("mini-player");
-      delete document.body.dataset.playerOwner;
+    if (typeof document !== "undefined") {
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+      document.removeEventListener("webkitfullscreenchange", handleFullscreenChange);
+      document.removeEventListener("mozfullscreenchange", handleFullscreenChange);
+      document.removeEventListener("MSFullscreenChange", handleFullscreenChange);
+
+      if (document.body.dataset.playerOwner === String(myId)) {
+        document.body.style.paddingTop = "";
+        document.body.classList.remove("mini-player");
+        delete document.body.dataset.playerOwner;
+      }
     }
     mobilePlayerId.update((id) => (id === myId ? null : id));
   });
@@ -133,7 +201,6 @@
   // Touch Events (Mobile)
   function handleTouchStart(e: TouchEvent) {
     if ((e.target as HTMLElement).closest(".drag-handle")) {
-      // e.preventDefault(); // Might block scrolling, careful. But we want to drag.
       const touch = e.touches[0];
       handleStart(touch.clientX, touch.clientY);
       window.addEventListener("touchmove", handleTouchMoveWindow, {
@@ -218,7 +285,7 @@
     }
 
     // Desktop floating window only: shrink the window for portrait videos.
-    if ($isMobile) return;
+    if (isPhoneMode) return;
     const target = e.target as HTMLVideoElement;
     const videoWidth = target.videoWidth;
     const videoHeight = target.videoHeight;
@@ -237,7 +304,7 @@
   }
 </script>
 
-{#if $isMobile}
+{#if isPhoneMode}
   <!-- Phone player: docked full-width at the top, or minimized to a bar above the tab bar -->
   <div
     bind:clientHeight={dockHeight}
@@ -275,6 +342,17 @@
             </div>
           {/if}
           <button
+            on:click={toggleFullscreen}
+            class="flex h-11 w-11 items-center justify-center text-gray-300 active:text-white"
+            aria-label={isFullscreen ? "Exit fullscreen" : "Full screen"}
+          >
+            {#if isFullscreen}
+              <Minimize size={20} />
+            {:else}
+              <Maximize size={20} />
+            {/if}
+          </button>
+          <button
             on:click={() => (minimized = true)}
             class="flex h-11 w-11 items-center justify-center text-gray-300 active:text-white"
             aria-label="Minimize player"
@@ -305,6 +383,9 @@
         controls={!minimized}
         autoplay
         playsinline
+        webkit-playsinline
+        on:webkitbeginfullscreen={() => { isFullscreen = true; }}
+        on:webkitendfullscreen={() => { isFullscreen = false; isPhoneMode = $isMobile; }}
         on:loadedmetadata={handleLoadedMetadata}
         on:timeupdate={handleTimeUpdate}
         on:volumechange={handleVolumeChange}
@@ -381,6 +462,17 @@
           </div>
         {/if}
         <button
+          on:click|stopPropagation={toggleFullscreen}
+          class="p-1 text-gray-400 hover:text-white transition"
+          aria-label={isFullscreen ? "Exit fullscreen" : "Full screen"}
+        >
+          {#if isFullscreen}
+            <Minimize size={16} />
+          {:else}
+            <Maximize size={16} />
+          {/if}
+        </button>
+        <button
           on:click|stopPropagation={close}
           class="text-gray-400 hover:text-white px-2 text-lg leading-none"
         >
@@ -399,6 +491,10 @@
         class="w-full h-full max-w-full max-h-full object-contain"
         controls
         autoplay
+        playsinline
+        webkit-playsinline
+        on:webkitbeginfullscreen={() => { isFullscreen = true; }}
+        on:webkitendfullscreen={() => { isFullscreen = false; isPhoneMode = $isMobile; }}
         on:loadedmetadata={handleLoadedMetadata}
         on:timeupdate={handleTimeUpdate}
         on:volumechange={handleVolumeChange}

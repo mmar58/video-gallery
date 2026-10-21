@@ -107,7 +107,7 @@
 	<link rel="icon" href={favicon} />
 </svelte:head>
 
-<div class="fixed right-4 top-4 z-40 hidden items-center gap-2 md:flex">
+<div class="fixed right-4 top-4 z-40 {$isMobile ? 'hidden' : 'hidden md:flex'} items-center gap-2">
 	{#if showChrome}
 		{#if $authStore.user?.is_admin}
 			<button

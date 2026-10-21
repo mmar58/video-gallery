@@ -169,7 +169,7 @@ label,
   display: none;
 }
 
-@media (max-width: 767px) {
+@media (max-width: 767px), ((pointer: coarse) and (max-height: 550px)), ((orientation: landscape) and (max-height: 500px)) {
   /* 16px+ inputs prevent iOS Safari from zooming the page on focus. */
   input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
   select,
@@ -203,6 +203,26 @@ label,
     ) !important;
   }
 }
+
+/* Ensure video expands edge-to-edge when in native fullscreen */
+video:fullscreen {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100vw !important;
+  max-height: 100vh !important;
+  object-fit: contain !important;
+  background-color: #000 !important;
+}
+
+video:-webkit-full-screen {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100vw !important;
+  max-height: 100vh !important;
+  object-fit: contain !important;
+  background-color: #000 !important;
+}
+
 
 /* Backdrop blur is expensive on phone GPUs; fall back to the solid tint. */
 @media (pointer: coarse) {

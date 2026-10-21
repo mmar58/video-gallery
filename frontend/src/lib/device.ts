@@ -16,8 +16,14 @@ function mediaQuery(query: string): Readable<boolean> {
     });
 }
 
-/** Viewport narrower than Tailwind's `md` breakpoint (768px). */
-export const isMobile = mediaQuery("(max-width: 767px)");
+/**
+ * Mobile phone in portrait (width <= 767px),
+ * OR mobile phone in landscape (touch device with short height <= 550px, or landscape <= 500px).
+ */
+export const isMobile = mediaQuery(
+    "(max-width: 767px), ((pointer: coarse) and (max-height: 550px)), ((orientation: landscape) and (max-height: 500px))"
+);
 
 /** Primary input is a finger (no hover, coarse pointer). */
 export const isTouch = mediaQuery("(pointer: coarse)");
+
